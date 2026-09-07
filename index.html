@@ -120,7 +120,7 @@ canvas { display: block; width: 100%; height: auto; }
 
 <!-- Premium Upgrade Button -->
 <div style="text-align: center; margin: 20px 0;">
-  <a href="https://form.jotform.com/262488810871062" 
+  <a id="premium-btn" href="https://form.jotform.com/262488810871062" target="_blank" rel="noopener noreferrer" 
      style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
             color: white; 
             padding: 14px 32px; 
@@ -1912,15 +1912,44 @@ window.addEventListener('resize', () => {
 });
 </script>
 
-  <script>
+ <script>
+  // 1. Unlock premium if they just paid
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('payment') === 'success') {
+    localStorage.setItem('fcb_premium', 'true');
     window.history.replaceState({}, document.title, window.location.pathname);
     setTimeout(() => {
       alert('Welcome to Premium! Your subscription is active.');
     }, 500);
   }
+
+  // 2. Helper to check if user is premium
+  function isPremium() {
+    return localStorage.getItem('fcb_premium') === 'true';
+  }
+
+  // 3. Block chart access if not premium
+  function requirePremium() {
+    if (!isPremium()) {
+      const btn = document.getElementById('premium-btn');
+      if (btn) {
+        btn.style.animation = 'shake 0.5s';
+        btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => btn.style.animation = '', 500);
+      }
+      return false;
+    }
+    return true;
+  }
 </script>
+
+<style>
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+</style> 
 
 </body>
 </html>
