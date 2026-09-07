@@ -1078,9 +1078,9 @@ function drawScatter() {
   sctx.strokeStyle = '#333'; sctx.lineWidth = 2;
   sctx.beginPath(); sctx.moveTo(padL, padT + plotH); sctx.lineTo(padL + plotW, padT + plotH); sctx.stroke();
   sctx.beginPath(); sctx.moveTo(padL, padT); sctx.lineTo(padL, padT + plotH); sctx.stroke();
-  sctx.fillStyle = '#555'; sctx.font = 'bold 14px sans-serif'; sctx.textAlign = 'center'; sctx.textBaseline = 'top';
-  sctx.fillText(xParam, padL + plotW / 2, SH - 28);
-  sctx.save(); sctx.translate(20, padT + plotH / 2); sctx.rotate(-Math.PI / 2); sctx.textAlign = 'center'; sctx.textBaseline = 'middle'; sctx.fillText(yParam, 0, 0); sctx.restore();
+  sctx.fillStyle = '#111'; sctx.font = 'bold 20px sans-serif'; sctx.textAlign = 'center'; sctx.textBaseline = 'top';
+  sctx.fillText(xParam, padL + plotW / 2, SH - 44);
+  sctx.save(); sctx.translate(14, padT + plotH / 2); sctx.rotate(-Math.PI / 2); sctx.textAlign = 'center'; sctx.textBaseline = 'middle'; sctx.fillText(yParam, 0, 0); sctx.restore();
   const xTicks = getAxisTicks(xParam, 12);
   const yTicks = getAxisTicks(yParam, 12);
   sctx.font = 'bold 14px sans-serif'; sctx.fillStyle = 'black'; sctx.textAlign = 'center'; sctx.textBaseline = 'top';
