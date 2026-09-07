@@ -173,6 +173,13 @@ canvas { display: block; width: 100%; height: auto; }
     <div class="control-group"><label>Rank By</label><select id="scatterRankBy"><option value="" selected>None</option></select></div>
     <div class="control-group"><label>Show</label><select id="scatterFilter"><option value="all">All Players</option><option value="top10" selected>Top 10</option><option value="top20">Top 20</option><option value="top30">Top 30</option><option value="top50">Top 50</option></select></div>
     <div class="control-group"><label>Marker Size</label><select id="scatterSize"><option value="8">Small</option><option value="12" selected>Medium</option><option value="16">Large</option></select></div>
+    <div class="control-group"><label>Name Labels</label>
+  <div style="display:flex;gap:10px;font-size:0.72rem;margin-bottom:4px;">
+    <span onclick="toggleAllScatterNames(true)" style="cursor:pointer;color:#0066CC;font-weight:700;">All</span>
+    <span onclick="toggleAllScatterNames(false)" style="cursor:pointer;color:#c62828;font-weight:700;">None</span>
+  </div>
+  <div class="param-box" id="scatterNameList" style="min-width:180px;max-height:160px;"></div>
+</div>
   </div>
   <div class="shooting-controls" id="shootingControls">
     <div class="control-group"><label>Team A</label><select id="teamA"><option value="">None</option></select></div>
@@ -291,6 +298,7 @@ const paramBox = document.getElementById('paramBox');
 const scatterX = document.getElementById('scatterX'), scatterY = document.getElementById('scatterY');
 const scatterRankBy = document.getElementById('scatterRankBy'), scatterFilter = document.getElementById('scatterFilter');
 const scatterSize = document.getElementById('scatterSize'), scatterOverlay = document.getElementById('scatterOverlay');
+const scatterNameList = document.getElementById('scatterNameList');  
 const teamASelect = document.getElementById('teamA'), teamBSelect = document.getElementById('teamB');
 const shotFilterSelect = document.getElementById('shotFilter');
 const passingMatchSelect = document.getElementById('passingMatchSelect');
@@ -778,7 +786,23 @@ function loadData(data, sourceName) {
 function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 function populateDropdowns() { selectA.innerHTML = ''; selectB.innerHTML = ''; selectA.add(new Option('None', '')); selectB.add(new Option('None', '')); playerNames.forEach(name => { selectA.add(new Option(name, name)); selectB.add(new Option(name, name)); }); }
 function populateParameters() { let html = ''; paramNames.forEach(name => { html += '<label><input type="checkbox" value="' + escapeHtml(name) + '" checked onchange="onParamChange(this)">' + escapeHtml(name) + '</label>'; }); paramBox.innerHTML = html; }
-function populateScatterDropdowns() { scatterX.innerHTML = '<option value="">None</option>'; scatterY.innerHTML = '<option value="">None</option>'; scatterRankBy.innerHTML = '<option value="" selected>None</option>'; paramNames.forEach(name => { scatterX.add(new Option(name, name)); scatterY.add(new Option(name, name)); scatterRankBy.add(new Option(name, name)); }); }
+function populateScatterDropdowns() { scatterX.innerHTML = '<option value="">None</option>'; scatterY.innerHTML = '<option value="">None</option>'; scatterRankBy.innerHTML = '<option value="" selected>None</option>'; paramNames.forEach(name => { scatterX.add(new Option(name, name)); scatterY.add(new Option(name, name)); scatterRankBy.add(new Option(name, name)); });populateScatterNameList(); }
+function populateScatterNameList() {
+  scatterNameList.innerHTML = '';
+  playerNames.forEach(name => {
+    const lbl = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = false; cb.value = name;
+    cb.addEventListener('change', () => { if (currentChart === 'scatter') drawScatter(); });
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(name));
+    scatterNameList.appendChild(lbl);
+  });
+}
+function toggleAllScatterNames(on) {
+  scatterNameList.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = on);
+  if (currentChart === 'scatter') drawScatter();
+}
 function onParamChange(cb) { cb.checked ? selectedParams.add(cb.value) : selectedParams.delete(cb.value); drawRadar(); }
 function updateParamCheckboxes() { paramBox.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = selectedParams.has(cb.value); }); }
 function getActiveParams() { return paramNames.filter(p => selectedParams.has(p)); }
@@ -1106,6 +1130,7 @@ function drawScatter() {
   sctx.fillText('avg', medianPx, padT - 8);
   const filteredPlayers = getFilteredPlayers();
   const filteredSet = new Set(filteredPlayers);
+  const checkedNames = new Set(Array.from(scatterNameList.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value));
   const positions = [];
   playerNames.forEach((name, idx) => {
     const xVal = getPlayerParamValue(name, xParam), yVal = getPlayerParamValue(name, yParam);
@@ -1162,6 +1187,7 @@ function drawScatter() {
     const nameLabel = document.createElement('div');
     nameLabel.className = 'marker-name';
     nameLabel.textContent = pos.name;
+    if (!checkedNames.has(pos.name)) nameLabel.style.display = 'none';
     marker.appendChild(nameLabel);
     marker.style.left = (pos.px / SW * 100) + '%';
     marker.style.top = (pos.py / SH * 100) + '%';
