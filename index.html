@@ -1161,7 +1161,7 @@ function drawScatter() {
     }
     const nameLabel = document.createElement('div');
     nameLabel.className = 'marker-name';
-    nameLabel.textContent = getShortName(pos.name);
+    nameLabel.textContent = pos.name;
     marker.appendChild(nameLabel);
     marker.style.left = (pos.px / SW * 100) + '%';
     marker.style.top = (pos.py / SH * 100) + '%';
