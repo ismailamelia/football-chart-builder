@@ -119,7 +119,7 @@ canvas { display: block; width: 100%; height: auto; }
 <p class="subtitle">Pick a visualization, upload your data, and generate pro charts</p>
 
 <!-- Premium Upgrade Button -->
-<div style="text-align: center; margin: 20px 0;">
+<div id="premium-section" style="text-align: center; margin: 20px 0;">
   <a id="premium-btn" href="https://form.jotform.com/262488810871062" target="_blank" rel="noopener noreferrer" 
      style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
             color: white; 
@@ -1945,6 +1945,11 @@ window.addEventListener('resize', () => {
     }
     return true;
   }
+   // Hide upgrade button for paid users
+if (isPremium()) {
+  const section = document.getElementById('premium-section');
+  if (section) section.style.display = 'none';
+}
 </script>
 
 <style>
