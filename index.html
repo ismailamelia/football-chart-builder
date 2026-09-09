@@ -621,12 +621,14 @@ function parseExcel(arrayBuffer) {
         if (json[r] && json[r].some(h => h !== undefined && h !== '')) { hRow = r; break; }
       }
       const sh = json[hRow] || [];
-      const li = sh.findIndex(h => { const l = String(h).toLowerCase().trim(); return l.includes('url') || l.includes('logo'); });
+      const li = sh.findIndex(h => { const l = String(h).toLowerCase().trim(); return ['url','logo','crest','badge','image','img','icon','shield','emblem'].some(k => l.includes(k)); });
       const ti = sh.findIndex(h => { const l = String(h).toLowerCase().trim(); return l === 'team' || l === 'club' || l === 'club_name'; });
       if (li >= 0 && ti >= 0) {
         for (let i = hRow + 1; i < json.length; i++) {
           const team = json[i][ti]; const url = json[i][li];
-          if (team && url && String(url).trim().match(/^https?:/) && !teamLogos[team]) teamLogos[team] = String(url).trim();
+          let u2 = String(url || '').trim().replace(/^["']+|["']+$/g, '');
+          if (u2.match(/^\/\//)) u2 = 'https:' + u2;
+          if (team && u2.match(/^https?:\/\//) && !teamLogos[team]) teamLogos[team] = u2;
         }
       }
     }
@@ -857,11 +859,13 @@ function loadData(data, sourceName) {
       fileInfo.classList.add('error'); fileInfo.classList.add('show');
       return;
     }
-    const logoIdx = headers.findIndex(h => { const l = String(h).toLowerCase().trim(); return l.includes('url') || l.includes('logo'); });
+    const logoIdx = headers.findIndex(h => { const l = String(h).toLowerCase().trim(); return ['url','logo','crest','badge','image','img','icon','shield','emblem'].some(k => l.includes(k)); });
     if (logoIdx >= 0 && logoIdx !== tIdx) {
       for (let i = 1; i < rawData.length; i++) {
         const row = rawData[i]; const team = row[tIdx]; const url = row[logoIdx];
-        if (team && url && String(url).trim().match(/^https?:/) && !teamLogos[team]) teamLogos[team] = String(url).trim();
+        let u = String(url || '').trim().replace(/^["']+|["']+$/g, '');
+        if (u.match(/^\/\//)) u = 'https:' + u;
+        if (team && u.match(/^https?:\/\//) && !teamLogos[team]) teamLogos[team] = u;
       }
     } else {
       for (let i = 1; i < rawData.length; i++) {
@@ -869,7 +873,8 @@ function loadData(data, sourceName) {
         if (!team || teamLogos[team]) continue;
         for (let j = 0; j < row.length; j++) {
           if (j === tIdx) continue;
-          const val = String(row[j] || '').trim();
+          let val = String(row[j] || '').trim().replace(/^["']+|["']+$/g, '');
+          if (val.match(/^\/\//)) val = 'https:' + val;
           if (/^https?:\/\/.+/.test(val)) { teamLogos[team] = val; break; }
         }
       }
@@ -1603,8 +1608,11 @@ function drawXGChart() {
   const xToPx = function (m) { return padL + (m / maxMinute) * plotW; };
   const yToPx = function (v) { return padT + plotH - (v / yMax) * plotH; };
 
-  drawTextCtx(ctx, teams.length > 1 ? teamA + '  vs  ' + teamB : teamA, Wg / 2, 30, '#111', 'bold 26px "Segoe UI", sans-serif');
-  drawTextCtx(ctx, 'Cumulative Expected Goals (xG) Race', Wg / 2, 58, '#888', '15px "Segoe UI", sans-serif');
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#111111'; ctx.font = 'bold 24px "Segoe UI", sans-serif';
+  ctx.fillText(teams.length > 1 ? teamA + '  vs  ' + teamB : teamA, padL, 20);
+  ctx.fillStyle = '#888888'; ctx.font = '13px "Segoe UI", sans-serif';
+  ctx.fillText('Cumulative Expected Goals (xG) Race', padL, 44);
 
   ctx.fillStyle = '#c9c9c9'; ctx.font = 'bold 20px "Segoe UI", sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1655,9 +1663,11 @@ function drawXGChart() {
     return { px: xToPx(g.minute), py: yToPx(cumAt(g.teamIndex, g.minute)), teamIndex: g.teamIndex, event: g.event, minute: g.minute, score: sA + '-' + sB };
   });
   const boxW = 185, boxH = 46;
-  annotations.filter(function (a) { return a.teamIndex === 0; }).sort(function (a, b) { return a.minute - b.minute; })
+  const leaderIdx = totalXg.length > 1 && totalXg[1] > totalXg[0] ? 1 : 0;
+  const loserIdx = 1 - leaderIdx;
+  annotations.filter(function (a) { return a.teamIndex === leaderIdx; }).sort(function (a, b) { return a.minute - b.minute; })
     .forEach(function (a, i) { a.bx = Math.min(Math.max(a.px - boxW - 15, padL + 5), padL + plotW - boxW - 5); a.by = padT + 20 + i * (boxH + 12); });
-  annotations.filter(function (a) { return a.teamIndex === 1; }).sort(function (a, b) { return a.minute - b.minute; })
+  annotations.filter(function (a) { return a.teamIndex === loserIdx; }).sort(function (a, b) { return a.minute - b.minute; })
     .forEach(function (a, i) { a.bx = Math.min(Math.max(a.px - boxW - 15, padL + 5), padL + plotW - boxW - 5); a.by = padT + plotH - 20 - boxH - i * (boxH + 12); });
 
   annotations.forEach(function (a) {
@@ -1680,7 +1690,12 @@ function drawXGChart() {
   const panelX = padL + plotW + 30;
   teams.forEach(function (team, ti) {
     const color = ti === 0 ? xgTeamAColor : xgTeamBColor;
-    const topY = padT + 40 + ti * 130;
+    let topY = Math.max(padT + 35, Math.min(yToPx(totalXg[ti]), padT + plotH - 35));
+    if (teams.length > 1 && ti === 1) {
+      const otherY = Math.max(padT + 35, Math.min(yToPx(totalXg[0]), padT + plotH - 35));
+      if (Math.abs(topY - otherY) < 90) topY = otherY + (topY >= otherY ? 90 : -90);
+      topY = Math.max(padT + 35, Math.min(topY, padT + plotH - 35));
+    }
     const logoUrl = teamLogos[team] || getClubLogoUrl(team) || '';
     if (logoUrl) {
       let img = xgLogoImgs[team];
@@ -1696,6 +1711,14 @@ function drawXGChart() {
         ctx.beginPath(); ctx.arc(panelX + 26, topY, 24, 0, Math.PI * 2);
         ctx.strokeStyle = '#dddddd'; ctx.lineWidth = 1; ctx.stroke();
       }
+    } else {
+      ctx.beginPath(); ctx.arc(panelX + 26, topY, 24, 0, Math.PI * 2);
+      ctx.fillStyle = '#f5f5f5'; ctx.fill();
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = color; ctx.font = 'bold 11px "Segoe UI", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const initials = team.split(/\s+/).map(function (w) { return w[0]; }).join('').substring(0, 3).toUpperCase();
+      ctx.fillText(initials, panelX + 26, topY);
     }
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillStyle = color; ctx.font = 'bold 15px "Segoe UI", sans-serif';
