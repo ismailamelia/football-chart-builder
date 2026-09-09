@@ -1669,6 +1669,9 @@ function getFilteredPasses() {
     if (playerF && player !== playerF) continue;
     const typeStr = c.type >= 0 ? String(row[c.type] || '').toLowerCase() : '';
     const outcomeStr = c.outcome >= 0 ? String(row[c.outcome] || '').toLowerCase() : '';
+    const rowText = row.map(function (v) { return String(v || '').toLowerCase(); }).join(' ');
+    const isCornerKick = typeStr.includes('corner') || rowText.includes('corner') || (sx >= 118.5 && (sy <= 2 || sy >= 78));
+    const isFreeKick = typeStr.includes('free') || rowText.includes('free kick') || rowText.includes('free-kick') || rowText.includes('freekick');
     const successful = c.successful >= 0 ? truthy(row[c.successful]) : (outcomeStr === 'complete' || outcomeStr === 'completed');
     const isCross = c.cross >= 0 ? truthy(row[c.cross]) : false;
     const isSwitch = c.switch >= 0 ? truthy(row[c.switch]) : false;
@@ -1676,8 +1679,8 @@ function getFilteredPasses() {
     const isGoalAssist = c.goalAssist >= 0 ? truthy(row[c.goalAssist]) : false;
     let ok = true;
     if (typeF === 'completed') ok = successful;
-    else if (typeF === 'corner') ok = typeStr.includes('corner');
-    else if (typeF === 'free_kick') ok = typeStr.includes('free');
+    else if (typeF === 'corner') ok = isCornerKick;
+    else if (typeF === 'free_kick') ok = isFreeKick;
     else if (typeF === 'final_third') ok = sx >= 80;
     else if (typeF === 'cross') ok = isCross;
     else if (typeF === 'switch') ok = isSwitch;
