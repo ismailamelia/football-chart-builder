@@ -621,8 +621,19 @@ function parseExcel(arrayBuffer) {
         if (json[r] && json[r].some(h => h !== undefined && h !== '')) { hRow = r; break; }
       }
       const sh = json[hRow] || [];
-      const li = sh.findIndex(h => { const l = String(h).toLowerCase().trim(); return ['url','logo','crest','badge','image','img','icon','shield','emblem'].some(k => l.includes(k)); });
       const ti = sh.findIndex(h => { const l = String(h).toLowerCase().trim(); return l === 'team' || l === 'club' || l === 'club_name'; });
+      const urlRe2 = /^(https?:)?\/\/.+\..+/;
+      let li = -1, liScore = 0;
+      for (let j = 0; j < sh.length; j++) {
+        if (j === ti) continue;
+        let cnt = 0;
+        for (let i = hRow + 1; i < json.length; i++) {
+          const v = String((json[i] || [])[j] || '').trim().replace(/^["']+|["']+$/g, '');
+          if (urlRe2.test(v)) cnt++;
+        }
+        const kwB = ['url','logo','crest','badge','image','img','icon','shield','emblem'].some(k => String(sh[j] || '').toLowerCase().includes(k)) ? 1000 : 0;
+        if (cnt > 0 && cnt + kwB > liScore) { liScore = cnt + kwB; li = j; }
+      }
       if (li >= 0 && ti >= 0) {
         for (let i = hRow + 1; i < json.length; i++) {
           const team = json[i][ti]; const url = json[i][li];
@@ -859,24 +870,26 @@ function loadData(data, sourceName) {
       fileInfo.classList.add('error'); fileInfo.classList.add('show');
       return;
     }
-    const logoIdx = headers.findIndex(h => { const l = String(h).toLowerCase().trim(); return ['url','logo','crest','badge','image','img','icon','shield','emblem'].some(k => l.includes(k)); });
-    if (logoIdx >= 0 && logoIdx !== tIdx) {
+    const coreCols = [tIdx, mIdx, xgIdx];
+    const urlRe = /^(https?:)?\/\/.+\..+/;
+    let logoCol = -1, logoColScore = 0;
+    for (let j = 0; j < headers.length; j++) {
+      if (coreCols.indexOf(j) >= 0) continue;
+      let urlCount = 0, kw = String(headers[j] || '').toLowerCase();
       for (let i = 1; i < rawData.length; i++) {
-        const row = rawData[i]; const team = row[tIdx]; const url = row[logoIdx];
-        let u = String(url || '').trim().replace(/^["']+|["']+$/g, '');
-        if (u.match(/^\/\//)) u = 'https:' + u;
-        if (team && u.match(/^https?:\/\//) && !teamLogos[team]) teamLogos[team] = u;
+        const v = String((rawData[i] || [])[j] || '').trim().replace(/^["']+|["']+$/g, '');
+        if (urlRe.test(v)) urlCount++;
       }
-    } else {
+      const kwBonus = ['url','logo','crest','badge','image','img','icon','shield','emblem'].some(k => kw.includes(k)) ? 1000 : 0;
+      const score = urlCount + kwBonus;
+      if (urlCount > 0 && score > logoColScore) { logoColScore = score; logoCol = j; }
+    }
+    if (logoCol >= 0) {
       for (let i = 1; i < rawData.length; i++) {
         const row = rawData[i]; const team = row[tIdx];
-        if (!team || teamLogos[team]) continue;
-        for (let j = 0; j < row.length; j++) {
-          if (j === tIdx) continue;
-          let val = String(row[j] || '').trim().replace(/^["']+|["']+$/g, '');
-          if (val.match(/^\/\//)) val = 'https:' + val;
-          if (/^https?:\/\/.+/.test(val)) { teamLogos[team] = val; break; }
-        }
+        let u = String(row[logoCol] || '').trim().replace(/^["']+|["']+$/g, '');
+        if (u.match(/^\/\//)) u = 'https:' + u;
+        if (team && u.match(/^https?:\/\//) && !teamLogos[team]) teamLogos[team] = u;
       }
     }
     const teams = getXGTeams();
@@ -1602,7 +1615,7 @@ function drawXGChart() {
   const ht = 45;
   const totalXg = teamEvents.map(evts => Math.round(evts.reduce((s, e) => s + e.xg, 0) * 100) / 100);
   const goalCount = teamEvents.map(evts => evts.filter(e => e.isGoal).length);
-  const yMax = Math.max(0.5, xgNiceCeil(Math.max.apply(null, totalXg.concat([0.1])) * 1.15));
+  const yMax = Math.max(1, Math.ceil((Math.max.apply(null, totalXg.concat([0.1])) + 0.25) * 2) / 2);
   const padL = 75, padR = 230, padT = 95, padB = 75;
   const plotW = Wg - padL - padR, plotH = Hg - padT - padB;
   const xToPx = function (m) { return padL + (m / maxMinute) * plotW; };
@@ -1619,13 +1632,14 @@ function drawXGChart() {
   ctx.fillText('FIRST HALF', padL + (Math.min(ht, maxMinute) / maxMinute) * plotW / 2, padT - 30);
   if (maxMinute > ht) ctx.fillText('SECOND HALF', xToPx(ht) + (padL + plotW - xToPx(ht)) / 2, padT - 30);
 
-  for (let i = 0; i <= 5; i++) {
-    const v = yMax * i / 5, y = yToPx(v);
+  const yStep = yMax <= 2.5 ? 0.5 : 1;
+  for (let v = 0; v <= yMax + 0.001; v += yStep) {
+    const y = yToPx(Math.min(v, yMax));
     ctx.strokeStyle = '#efefef'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + plotW, y); ctx.stroke();
     ctx.fillStyle = '#666'; ctx.font = 'bold 13px "Segoe UI", sans-serif';
     ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-    ctx.fillText(v.toFixed(1) + (i === 5 ? ' xG' : ''), padL - 10, y);
+    ctx.fillText(v.toFixed(1) + (v >= yMax - 0.001 ? ' xG' : ''), padL - 10, y);
   }
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   ctx.fillStyle = '#333'; ctx.font = 'bold 13px "Segoe UI", sans-serif';
