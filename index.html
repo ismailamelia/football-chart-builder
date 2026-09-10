@@ -164,7 +164,7 @@ canvas { display: block; width: 100%; height: auto; }
     Unlock unlimited charts, pro exports & all formations
   </p>
   <p style="color: #667eea; font-size: 0.75rem; margin-top: 6px; cursor: pointer; text-decoration: underline;"
-   onclick="window.open('https://form.jotform.com/262488810871062', '_blank')">
+   onclick="restoreAccess()">
   Already paid? Restore access
 </p>
 </div>
@@ -2542,14 +2542,23 @@ window.addEventListener('resize', () => {
 </script>
 
  <script>
-  // 1. Unlock premium if they just paid
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('payment') === 'success') {
-    localStorage.setItem('fcb_premium', 'true');
-    window.history.replaceState({}, document.title, window.location.pathname);
-    setTimeout(() => {
-      alert('Welcome to Premium! Your subscription is active.');
-    }, 500);
+  // 1. Restore premium - verified against the server-side paid list (with 31-day expiry)
+  async function restoreAccess() {
+    const email = (prompt('Enter the email you used to pay:') || '').trim();
+    if (!email || !email.includes('@')) { alert('Please enter a valid email.'); return; }
+    try {
+      const res = await fetch('/.netlify/functions/restore-access?email=' + encodeURIComponent(email));
+      const data = await res.json();
+      if (data.premium) {
+        localStorage.setItem('fcb_premium', 'true');
+        alert('Premium restored - welcome back!');
+        location.reload();
+      } else {
+        alert('No active subscription found for ' + email + '. If you just paid, wait 1 minute and try again.');
+      }
+    } catch (e) {
+      alert('Could not verify right now - check your connection and try again.');
+    }
   }
 
   // 2. Helper to check if user is premium
