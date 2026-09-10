@@ -1,20 +1,41 @@
-exports.handler = async (event, context) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+const { getStore } = require("@netlify/blobs");
+
+exports.handler = async (event) => {
+  if (event.httpMethod !== "POST") return { statusCode: 405, body: "POST only" };
+
+  // 1) Secret check - strangers can't call this endpoint
+  const url = new URL(event.rawUrl, "https://example.com");
+  if (url.searchParams.get("key") !== process.env.JOTFORM_SECRET) {
+    return { statusCode: 403, body: "forbidden" };
   }
 
-  try {
-    const params = new URLSearchParams(event.body);
-    const data = Object.fromEntries(params);
-    
-    console.log('New payment received:', JSON.stringify(data, null, 2));
+  // 2) Parse Jotform webhook (form-urlencoded)
+  const body = new URLSearchParams(event.body);
+  const email = (body.get("email") || "").toLowerCase().trim();
+  let paymentStatus = body.get("paymentStatus") || "";
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: 'Webhook received' })
-    };
-  } catch (error) {
-    console.error('Error:', error);
-    return { statusCode: 500, body: 'Error' };
+  // rawRequest fallback (full submission JSON)
+  if (!paymentStatus && body.get("rawRequest")) {
+    try {
+      const raw = JSON.parse(body.get("rawRequest"));
+      paymentStatus = raw.paymentStatus || "";
+    } catch (e) {}
   }
+
+  // 3) Only paid submissions unlock premium
+  if (paymentStatus !== "Completed") {
+    return { statusCode: 200, body: "ignored: " + (paymentStatus || "none") };
+  }
+  if (!email || !email.includes("@")) {
+    return { statusCode: 400, body: "bad email" };
+  }
+
+  // 4) Store paid email (31-day access from payment date)
+  const store = getStore("premium");
+  const emails = JSON.parse((await store.get("emails")) || "[]");
+  if (!emails.find(e => e.email === email)) {
+    emails.push({ email, until: Date.now() + 31 * 24 * 3600 * 1000 });
+    await store.set("emails", JSON.stringify(emails));
+  }
+  return { statusCode: 200, body: "premium granted" };
 };
