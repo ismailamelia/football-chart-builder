@@ -195,7 +195,7 @@ canvas { display: block; width: 100%; height: auto; }
     </div>
     <div class="file-info" id="fileInfo"></div>
   </div>
-  <div class="controls" id="radarControls">
+  <div class="controls" id="radarControls" style="flex-wrap:wrap;">
     <div class="control-group" style="flex-basis:100%;"><label>Parameters</label>
       <div style="position:relative;min-width:180px;max-width:260px;">
         <button type="button" id="radarParamToggle" onclick="toggleRadarParamPanel()" style="width:100%;font-size:0.85rem;padding:8px 10px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:6px;">Select params <span id="radarParamCount" style="color:#888;font-size:0.72rem;font-weight:600;"></span><span style="color:#888;">&#9662;</span></button>
@@ -1314,6 +1314,15 @@ function drawRadar() {
   if (!same) { drawSolidLine(ptsWeak, weakPal.border, 3); drawSolidLine(ptsStrong, strongPal.border, 3); } else { drawSolidLine(ptsWeak, palA.border, 3); }
   if (!same) { drawDotsNoOutline(ptsWeak, weakPal.border, 5); drawDotsNoOutline(ptsStrong, strongPal.border, 5); } else { drawDotsNoOutline(ptsWeak, palA.border, 5); }
   drawCanvasLegend(weakName, strongName, same, weakPal.border, strongPal.border, weakPal.colors[1], strongPal.colors[1]);
+
+  const metaAr = hasA ? getPlayerMeta(nameA) : null;
+  const metaBr = hasB ? getPlayerMeta(nameB) : null;
+  if (singleMode) {
+    drawRadarInfoBlock(singleName, hasA ? metaAr : metaBr, hasA ? colorA1 : colorB1, hasA ? colorA2 : colorB2, cx);
+  } else {
+    drawRadarInfoBlock(nameA, metaAr, colorA1, colorA2, W * 0.27);
+    drawRadarInfoBlock(nameB, metaBr, colorB1, colorB2, W * 0.73);
+  }
 }
 function drawCanvasLegend(weakName, strongName, same, weakColor, strongColor, weakColor2, strongColor2) {
   const legendX = W - 420, legendY = 115, lineLen = 45, dotR = 3, gap = 8;
@@ -1333,14 +1342,6 @@ function drawCanvasLegend(weakName, strongName, same, weakColor, strongColor, we
     ctx.beginPath(); ctx.arc(legendX + lineLen / 2, legendY, dotR, 0, Math.PI * 2); ctx.fillStyle = weakColor; ctx.fill();
     ctx.beginPath(); ctx.arc(legendX + lineLen / 2 + gap + 6, legendY, 6, 0, Math.PI * 2); ctx.fillStyle = weakColor2; ctx.fill(); ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
     drawTextCtx(ctx, weakName, legendX + lineLen + gap + 18, legendY, 'black', '18px sans-serif', 'left', 'middle');
-  }
-  const metaAr = hasA ? getPlayerMeta(nameA) : null;
-  const metaBr = hasB ? getPlayerMeta(nameB) : null;
-  if (singleMode) {
-    drawRadarInfoBlock(singleName, hasA ? metaAr : metaBr, hasA ? colorA1 : colorB1, hasA ? colorA2 : colorB2, cx);
-  } else {
-    drawRadarInfoBlock(nameA, metaAr, colorA1, colorA2, W * 0.27);
-    drawRadarInfoBlock(nameB, metaBr, colorB1, colorB2, W * 0.73);
   }
 }
 function drawCanvasLegendSingle(name, color, color2) {
