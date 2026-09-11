@@ -167,6 +167,10 @@ canvas { display: block; width: 100%; height: auto; }
    onclick="restoreAccess()">
   Already paid? Restore access
 </p>
+  <p id="logout-link" style="display:none; color: #c62828; font-size: 0.75rem; margin-top: 4px; cursor: pointer; text-decoration: underline;"
+   onclick="logoutPremium()">
+  Sign out
+</p>
 </div>
   
 <div class="landing-page" id="landingPage">
@@ -2561,6 +2565,12 @@ window.addEventListener('resize', () => {
     }
   }
 
+  // 1b. Sign out
+  function logoutPremium() {
+    localStorage.removeItem('fcb_premium');
+    location.reload();
+  }
+
   // 2. Helper to check if user is premium
   function isPremium() {
     return localStorage.getItem('fcb_premium') === 'true';
@@ -2579,10 +2589,12 @@ window.addEventListener('resize', () => {
     }
     return true;
   }
-   // Hide upgrade button for paid users
+   // Hide upgrade button for paid users + show sign-out
 if (isPremium()) {
   const section = document.getElementById('premium-section');
   if (section) section.style.display = 'none';
+  const lo = document.getElementById('logout-link');
+  if (lo) lo.style.display = 'block';
 }
 </script>
 
