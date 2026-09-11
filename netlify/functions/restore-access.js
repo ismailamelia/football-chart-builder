@@ -11,7 +11,7 @@ exports.handler = async (event) => {
     try { if (!email) email = (JSON.parse(event.body).email || "").toLowerCase().trim(); } catch (e) {}
   }
   const key = q.get("key") || "";
-  const store = getStore("premium");
+  const store = getStore("premium", { siteID: process.env.BLOBS_SITE_ID, token: process.env.BLOBS_TOKEN });
 
   // --- ADMIN GRANT: ?key=SECRET&add=1&email=... (adds or extends 31 days) ---
   if (q.get("add") === "1") {
