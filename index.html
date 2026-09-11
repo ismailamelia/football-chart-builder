@@ -196,9 +196,6 @@ canvas { display: block; width: 100%; height: auto; }
     <div class="file-info" id="fileInfo"></div>
   </div>
   <div class="controls" id="radarControls">
-    <div class="control-group"><label id="labelA" style="color:#c41e1e">Player A</label><select id="playerA"><option>None</option></select><div class="color-picker-wrap"><div class="color-picker" id="colorPickerA1"><div class="color-picker-btn" id="colorBtnA1" style="background:#c41e1e"></div><div class="color-picker-dropdown" id="colorDropA1"></div></div><div class="color-picker" id="colorPickerA2"><div class="color-picker-btn" id="colorBtnA2" style="background:#d4a017"></div><div class="color-picker-dropdown" id="colorDropA2"></div></div></div><div class="player-info-card"><div class="club-name" id="clubA">&mdash;</div><div class="club-logo-wrap" id="logoWrapA"><div class="club-logo-fallback" id="logoFallbackA">&mdash;</div></div><table class="player-info-table"><tr><td>Position</td><td id="posA">&mdash;</td></tr><tr><td>Nationality</td><td id="natA">&mdash;</td></tr></table></div></div>
-    <div class="vs-badge">VS</div>
-    <div class="control-group"><label id="labelB" style="color:#0066CC">Player B</label><select id="playerB"><option>None</option></select><div class="color-picker-wrap"><div class="color-picker" id="colorPickerB1"><div class="color-picker-btn" id="colorBtnB1" style="background:#0066CC"></div><div class="color-picker-dropdown" id="colorDropB1"></div></div><div class="color-picker" id="colorPickerB2"><div class="color-picker-btn" id="colorBtnB2" style="background:#87CEEB"></div><div class="color-picker-dropdown" id="colorDropB2"></div></div></div><div class="player-info-card"><div class="club-name" id="clubB">&mdash;</div><div class="club-logo-wrap" id="logoWrapB"><div class="club-logo-fallback" id="logoFallbackB">&mdash;</div></div><table class="player-info-table"><tr><td>Position</td><td id="posB">&mdash;</td></tr><tr><td>Nationality</td><td id="natB">&mdash;</td></tr></table></div></div>
     <div class="control-group"><label>Parameters</label>
       <div style="position:relative;min-width:180px;">
         <button type="button" id="radarParamToggle" onclick="toggleRadarParamPanel()" style="width:100%;font-size:0.85rem;padding:8px 10px;border:2px solid #ddd;border-radius:8px;background:white;cursor:pointer;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:6px;">Select params <span id="radarParamCount" style="color:#888;font-size:0.72rem;font-weight:600;"></span><span style="color:#888;">&#9662;</span></button>
@@ -207,6 +204,10 @@ canvas { display: block; width: 100%; height: auto; }
         </div>
       </div>
     </div>
+    <div class="control-group"><label id="labelA" style="color:#c41e1e">Player A</label><select id="playerA"><option>None</option></select><div class="color-picker-wrap"><div class="color-picker" id="colorPickerA1"><div class="color-picker-btn" id="colorBtnA1" style="background:#c41e1e"></div><div class="color-picker-dropdown" id="colorDropA1"></div></div><div class="color-picker" id="colorPickerA2"><div class="color-picker-btn" id="colorBtnA2" style="background:#d4a017"></div><div class="color-picker-dropdown" id="colorDropA2"></div></div></div></div>
+    <div class="vs-badge">VS</div>
+    <div class="control-group"><label id="labelB" style="color:#0066CC">Player B</label><select id="playerB"><option>None</option></select><div class="color-picker-wrap"><div class="color-picker" id="colorPickerB1"><div class="color-picker-btn" id="colorBtnB1" style="background:#0066CC"></div><div class="color-picker-dropdown" id="colorDropB1"></div></div><div class="color-picker" id="colorPickerB2"><div class="color-picker-btn" id="colorBtnB2" style="background:#87CEEB"></div><div class="color-picker-dropdown" id="colorDropB2"></div></div></div></div>
+    
   </div>
   <div class="scatter-controls" id="scatterControls">
     <div class="control-group"><label>X Axis</label><select id="scatterX"><option value="">None</option></select></div>
@@ -794,7 +795,7 @@ function getClubLogoUrl(clubName) {
   if (CLUB_LOGO_MAP[normalized]) { logoCache[normalized] = CLUB_LOGO_MAP[normalized]; return CLUB_LOGO_MAP[normalized]; }
   return '';
 }
-function updatePlayerInfoCard(prefix, meta) {
+function updatePlayerInfoCard(prefix, meta) { return;
   document.getElementById('club' + prefix).textContent = meta.club;
   document.getElementById('pos' + prefix).textContent = meta.position;
   document.getElementById('nat' + prefix).textContent = meta.nationality;
