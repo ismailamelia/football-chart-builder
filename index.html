@@ -1324,7 +1324,7 @@ function drawRadar() {
   }
 }
 function drawCanvasLegend(weakName, strongName, same, weakColor, strongColor, weakColor2, strongColor2) {
-  const legendX = W - 420, legendY = 115, lineLen = 45, dotR = 3, gap = 8;
+  const legendX = cx - 120, legendY = 1130, lineLen = 45, dotR = 3, gap = 8;
   if (!same) {
     const y1 = legendY;
     ctx.beginPath(); ctx.moveTo(legendX, y1); ctx.lineTo(legendX + lineLen, y1); ctx.strokeStyle = weakColor; ctx.lineWidth = 3; ctx.stroke();
@@ -1344,7 +1344,7 @@ function drawCanvasLegend(weakName, strongName, same, weakColor, strongColor, we
   }
 }
 function drawCanvasLegendSingle(name, color, color2) {
-  const legendX = W - 420, legendY = 115, lineLen = 45, dotR = 3, gap = 8;
+  const legendX = cx - 120, legendY = 1130, lineLen = 45, dotR = 3, gap = 8;
   ctx.beginPath(); ctx.moveTo(legendX, legendY); ctx.lineTo(legendX + lineLen, legendY); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
   ctx.beginPath(); ctx.arc(legendX + lineLen / 2, legendY, dotR, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
   ctx.beginPath(); ctx.arc(legendX + lineLen / 2 + gap + 6, legendY, 6, 0, Math.PI * 2); ctx.fillStyle = color2; ctx.fill(); ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke();
