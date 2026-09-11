@@ -28,6 +28,14 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: "bad email" };
   }
 
+  // 3b) Clear error if blob env vars are missing
+  const missing = [];
+  if (!process.env.BLOBS_SITE_ID) missing.push("BLOBS_SITE_ID");
+  if (!process.env.BLOBS_TOKEN) missing.push("BLOBS_TOKEN");
+  if (missing.length) {
+    return { statusCode: 500, body: "Missing env vars: " + missing.join(" and ") + ". Add in Netlify, then redeploy." };
+  }
+
   // 4) Add OR EXTEND access by 31 days from each successful charge
   const store = getStore("premium", { siteID: process.env.BLOBS_SITE_ID, token: process.env.BLOBS_TOKEN });
   const emails = JSON.parse((await store.get("emails")) || "[]");
