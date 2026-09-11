@@ -29,7 +29,7 @@ exports.handler = async (event) => {
   }
 
   // 4) Add OR EXTEND access by 31 days from each successful charge
-  const store = getStore("premium");
+  const store = getStore("premium", { siteID: process.env.BLOBS_SITE_ID, token: process.env.BLOBS_TOKEN });
   const emails = JSON.parse((await store.get("emails")) || "[]");
   const until = Date.now() + 31 * 24 * 3600 * 1000;
   const existing = emails.find(function (e) { return e.email === email; });
