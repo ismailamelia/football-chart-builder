@@ -1143,7 +1143,7 @@ function drawRadarInfoBlock(name, meta, colorMain, colorWeak, blockCx) {
   meta = meta || {};
   const stripTop = 24;
   drawTextCtx(ctx, (meta.club && meta.club !== '\u2014') ? meta.club : '', blockCx, stripTop + 18, '#333', 'bold 20px sans-serif');
-  const logoR = 36, logoCy = stripTop + 88;
+  const logoR = 47, logoCy = stripTop + 100;
   let logoUrl = meta.clubLogo || '';
   if (!logoUrl && meta.club && meta.club !== '\u2014') logoUrl = getClubLogoUrl(meta.club) || '';
   ctx.save();
@@ -1161,17 +1161,17 @@ function drawRadarInfoBlock(name, meta, colorMain, colorWeak, blockCx) {
   }
   if (!ready) { ctx.fillStyle = '#f0f0f0'; ctx.fill(); }
   ctx.restore();
-  ctx.beginPath(); ctx.arc(blockCx, logoCy, logoR, 0, Math.PI * 2); ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(blockCx, logoCy, logoR, 0, Math.PI * 2); ctx.strokeStyle = '#bbb'; ctx.lineWidth = 2; ctx.stroke();
   if (!ready) {
     const initials = (meta.club || '?').split(' ').map(function (w) { return w[0]; }).join('').substring(0, 3).toUpperCase();
-    drawTextCtx(ctx, initials, blockCx, logoCy, '#888', 'bold 15px sans-serif');
+    drawTextCtx(ctx, initials, blockCx, logoCy, '#888', 'bold 19px sans-serif');
   }
   ctx.font = 'bold 27px sans-serif';
   const nameW = ctx.measureText(name).width;
   const dotsGap = 22, nameY = logoCy + logoR + 32;
   const startX = blockCx - (nameW + dotsGap) / 2;
-  ctx.beginPath(); ctx.arc(startX + 6, nameY - 9, 8, 0, Math.PI * 2); ctx.fillStyle = colorMain; ctx.fill();
-  ctx.beginPath(); ctx.arc(startX + 6, nameY + 9, 8, 0, Math.PI * 2); ctx.fillStyle = colorWeak; ctx.fill();
+  ctx.beginPath(); ctx.arc(startX + 7, nameY - 11, 10, 0, Math.PI * 2); ctx.fillStyle = colorMain; ctx.fill();
+  ctx.beginPath(); ctx.arc(startX + 7, nameY + 11, 10, 0, Math.PI * 2); ctx.fillStyle = colorWeak; ctx.fill();
   drawTextCtx(ctx, name, startX + dotsGap, nameY, '#111', 'bold 27px sans-serif', 'left', 'middle');
   const pos = (meta.position && meta.position !== '\u2014') ? meta.position : '';
   const nat = (meta.nationality && meta.nationality !== '\u2014') ? meta.nationality : '';
