@@ -423,7 +423,7 @@ if (passingLogoInput) {
   });
 }
 
-const W = 1200, H = 1200, SW = 1200, SH = 900, cx = W / 2, cy = H / 2, R_MAX = 460;
+const W = 1200, H = 1200, SW = 1200, SH = 900, cx = W / 2, cy = H / 2 + 50, R_MAX = 368;
 const PALETTE_WEAK = { colors: ['#000000', '#0066CC'], border: 'black', labelColor: 'white', dash: false };
 const PALETTE_STRONG = { colors: ['#c41e1e', '#d4a017'], border: 'black', labelColor: 'black', dash: false };
 const palettes = [
@@ -1141,9 +1141,9 @@ const radarLogoImgs = {};
 function drawRadarInfoBlock(name, meta, colorMain, colorWeak, blockCx) {
   if (!name) return;
   meta = meta || {};
-  const stripTop = (ctx.canvas ? ctx.canvas.height : 1200) - 134;
-  drawTextCtx(ctx, (meta.club && meta.club !== '\u2014') ? meta.club : '', blockCx, stripTop + 10, '#333', 'bold 17px sans-serif');
-  const logoR = 24, logoCy = stripTop + 44;
+  const stripTop = 24;
+  drawTextCtx(ctx, (meta.club && meta.club !== '\u2014') ? meta.club : '', blockCx, stripTop + 18, '#333', 'bold 20px sans-serif');
+  const logoR = 36, logoCy = stripTop + 88;
   let logoUrl = meta.clubLogo || '';
   if (!logoUrl && meta.club && meta.club !== '\u2014') logoUrl = getClubLogoUrl(meta.club) || '';
   ctx.save();
@@ -1164,19 +1164,19 @@ function drawRadarInfoBlock(name, meta, colorMain, colorWeak, blockCx) {
   ctx.beginPath(); ctx.arc(blockCx, logoCy, logoR, 0, Math.PI * 2); ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1.5; ctx.stroke();
   if (!ready) {
     const initials = (meta.club || '?').split(' ').map(function (w) { return w[0]; }).join('').substring(0, 3).toUpperCase();
-    drawTextCtx(ctx, initials, blockCx, logoCy, '#888', 'bold 12px sans-serif');
+    drawTextCtx(ctx, initials, blockCx, logoCy, '#888', 'bold 15px sans-serif');
   }
-  ctx.font = 'bold 21px sans-serif';
+  ctx.font = 'bold 27px sans-serif';
   const nameW = ctx.measureText(name).width;
-  const dotsGap = 18, nameY = logoCy + logoR + 24;
+  const dotsGap = 22, nameY = logoCy + logoR + 32;
   const startX = blockCx - (nameW + dotsGap) / 2;
-  ctx.beginPath(); ctx.arc(startX + 5, nameY - 7, 6, 0, Math.PI * 2); ctx.fillStyle = colorMain; ctx.fill();
-  ctx.beginPath(); ctx.arc(startX + 5, nameY + 7, 6, 0, Math.PI * 2); ctx.fillStyle = colorWeak; ctx.fill();
-  drawTextCtx(ctx, name, startX + dotsGap, nameY, '#111', 'bold 21px sans-serif', 'left', 'middle');
+  ctx.beginPath(); ctx.arc(startX + 6, nameY - 9, 8, 0, Math.PI * 2); ctx.fillStyle = colorMain; ctx.fill();
+  ctx.beginPath(); ctx.arc(startX + 6, nameY + 9, 8, 0, Math.PI * 2); ctx.fillStyle = colorWeak; ctx.fill();
+  drawTextCtx(ctx, name, startX + dotsGap, nameY, '#111', 'bold 27px sans-serif', 'left', 'middle');
   const pos = (meta.position && meta.position !== '\u2014') ? meta.position : '';
   const nat = (meta.nationality && meta.nationality !== '\u2014') ? meta.nationality : '';
   const info = pos && nat ? pos + '  \u2022  ' + nat : (pos || nat);
-  drawTextCtx(ctx, info, blockCx, nameY + 22, '#666', '15px sans-serif');
+  drawTextCtx(ctx, info, blockCx, nameY + 30, '#666', '18px sans-serif');
 }
 function drawRadar() {
   if (!rawData || currentChart !== 'radar') return;
@@ -1194,8 +1194,6 @@ function drawRadar() {
   const singleName = hasA ? nameA : nameB, singleVals = hasA ? valsA : valsB;
   const palA = makePalette(colorA1, colorA2), palB = makePalette(colorB1, colorB2);
   ctx.fillStyle = 'white'; ctx.fillRect(0, 0, W, H);
-  if (singleMode) drawTextCtx(ctx, singleName + ' - Performance Radar', cx, 38, 'black', 'bold 32px sans-serif');
-  else drawTextCtx(ctx, nameA + ' VS ' + nameB, cx, 38, 'black', 'bold 32px sans-serif');
   for (let i = numBands; i > 0; i--) { ctx.beginPath(); ctx.arc(cx, cy, i * bandR, 0, Math.PI * 2); ctx.fillStyle = (i % 2 === 0) ? '#d9d9d9' : '#f0f0f0'; ctx.fill(); }
   if (singleMode) {
     const ptsSingle = getPolyPoints(singleVals, maxVals, nActive);
@@ -1320,6 +1318,7 @@ function drawRadar() {
   if (singleMode) {
     drawRadarInfoBlock(singleName, hasA ? metaAr : metaBr, hasA ? colorA1 : colorB1, hasA ? colorA2 : colorB2, cx);
   } else {
+    drawTextCtx(ctx, 'VS', cx, 112, '#111111', 'bold 48px sans-serif');
     drawRadarInfoBlock(nameA, metaAr, colorA1, colorA2, W * 0.27);
     drawRadarInfoBlock(nameB, metaBr, colorB1, colorB2, W * 0.73);
   }
