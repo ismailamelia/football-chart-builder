@@ -2171,7 +2171,7 @@ function smoothThreat(map, maxMinute) {
   const series = [];
   let ema = 0;
   for (let m = 0; m <= maxMinute; m++) {
-    ema = (map[m] || 0) + ema * 0.82;
+    ema = (map[m] || 0) + ema * 0.85;
     series.push(ema);
   }
   return series;
@@ -2199,6 +2199,23 @@ function drawMomSideLabel(c2, team, color, logoY, nameY, logoCy) {
   drawTextCtx(c2, team, lx, nameY, color, 'bold 18px sans-serif');
   drawTextCtx(c2, 'more threatening', lx, nameY + 22, '#888888', '11px sans-serif');
 }
+function getMomentumGoals() {
+  const c = getMomentumCols();
+  const goals = [];
+  for (let i = 1; i < rawData.length; i++) {
+    const row = rawData[i];
+    const team = String(row[c.team] || '').trim();
+    if (!team) continue;
+    const minute = parseFloat(row[c.minute]);
+    if (isNaN(minute) || minute > 90) continue;
+    const et = c.event >= 0 ? String(row[c.event] || '').toLowerCase() : '';
+    const oc = c.outcome >= 0 ? String(row[c.outcome] || '').toLowerCase() : '';
+    const isShot = et.includes('shot') || (c.shotType >= 0 && String(row[c.shotType] || '') !== '');
+    if (isShot && oc === 'goal') goals.push({ team: team, minute: minute, own: false });
+    else if (isShot && oc.includes('own')) goals.push({ team: team, minute: minute, own: true });
+  }
+  return goals;
+}
 function drawMomentum() {
   if (!rawData || currentChart !== 'momentum') return;
   const c2 = momentumCanvas.getContext('2d');
@@ -2222,11 +2239,14 @@ function drawMomentum() {
     const emaB = smoothThreat(clipMap(getTeamThreatMap(teamB)), maxMinute);
     diff = emaA.map(function (v, m) { return v - emaB[m]; });
   } else { diff = emaA; }
-  const series = diff.map(function (v, m) {
-    const a = m > 0 ? diff[m - 1] : v;
-    const b = m < diff.length - 1 ? diff[m + 1] : v;
-    return (a + v + b) / 3;
-  });
+  function ma3(arr) {
+    return arr.map(function (v, m) {
+      const a = m > 0 ? arr[m - 1] : v;
+      const b = m < arr.length - 1 ? arr[m + 1] : v;
+      return (a + v + b) / 3;
+    });
+  }
+  const series = ma3(ma3(diff));
   let maxAbs = 1;
   series.forEach(function (v) { const a = Math.abs(v); if (a > maxAbs) maxAbs = a; });
   const yMax = Math.max(1, Math.ceil(maxAbs * 1.15));
@@ -2300,10 +2320,28 @@ function drawMomentum() {
     c2.beginPath();
     c2.moveTo(xToPx(m), yD(series[m]));
     c2.lineTo(xToPx(m + 1), yD(series[m + 1]));
-    c2.strokeStyle = series[m] >= 0 ? colorA1 : colorB1;
+    c2.strokeStyle = (series[m] + series[m + 1]) / 2 >= 0 ? colorA1 : colorB1;
     c2.lineWidth = 2;
     c2.stroke();
   }
+
+  // goal markers (ball icon + minute, guide line) - like The Analyst
+  getMomentumGoals().forEach(function (g) {
+    let isA = g.team === teamA;
+    if (g.own && teamB) isA = !isA;
+    const gx = xToPx(g.minute);
+    const gy = isA ? padT + 20 : padT + plotH - 20;
+    const col = isA ? colorA1 : colorB1;
+    c2.strokeStyle = col; c2.globalAlpha = 0.35; c2.lineWidth = 1.5;
+    c2.beginPath();
+    if (isA) { c2.moveTo(gx, padT + 32); c2.lineTo(gx, zeroY); }
+    else { c2.moveTo(gx, zeroY); c2.lineTo(gx, padT + plotH - 32); }
+    c2.stroke();
+    c2.globalAlpha = 1;
+    c2.beginPath(); c2.arc(gx, gy, 11, 0, Math.PI * 2); c2.fillStyle = col; c2.fill();
+    c2.beginPath(); c2.arc(gx, gy, 5.5, 0, Math.PI * 2); c2.fillStyle = '#ffffff'; c2.fill();
+    drawTextCtx(c2, minuteLabel(g.minute), gx + 16, gy, col, 'bold 13px sans-serif', 'left', 'middle');
+  });
 
   // zero line
   c2.strokeStyle = '#333333'; c2.lineWidth = 2;
