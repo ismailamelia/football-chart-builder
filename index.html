@@ -2075,9 +2075,11 @@ function getMomentumCols() {
   return {
     team: find(['team', 'club']),
     minute: find(['minute', 'min']),
+    period: find(['period', 'half']),
     threat: find(['threat', 'momentum', 'value', 'attacking_threat']),
     event: find(['event_type', 'event', 'type', 'action']),
     x: find(['x']),
+    y: find(['y']),
     endX: find(['end_x']),
     endY: find(['end_y']),
     xg: find(['xg']),
@@ -2087,36 +2089,36 @@ function getMomentumCols() {
     goalAssist: find(['goal_assist', 'is_goal_assist', 'assist'])
   };
 }
-// Public-domain style xT grid (12 cols x 8 rows, attacking toward +X), values ~ x100
-const XT_GRID = [
-  [0.6, 0.8, 0.8, 0.9, 1.1, 1.3, 1.5, 1.7, 2.0, 2.4, 2.9, 3.7],
-  [0.7, 0.9, 0.9, 1.0, 1.2, 1.4, 1.7, 1.9, 2.3, 2.7, 3.3, 4.4],
-  [0.9, 1.0, 1.1, 1.2, 1.4, 1.7, 2.0, 2.4, 2.9, 3.5, 4.4, 5.9],
-  [1.1, 1.3, 1.4, 1.6, 1.9, 2.3, 2.7, 3.3, 4.1, 5.1, 6.5, 8.8],
-  [1.4, 1.6, 1.8, 2.1, 2.5, 3.0, 3.7, 4.5, 5.7, 7.3, 9.6, 13.4],
-  [1.9, 2.1, 2.4, 2.8, 3.4, 4.2, 5.1, 6.4, 8.2, 10.8, 14.7, 21.0],
-  [2.6, 2.9, 3.3, 3.9, 4.8, 5.9, 7.4, 9.5, 12.5, 16.9, 23.6, 35.3],
-  [3.7, 4.1, 4.6, 5.4, 6.7, 8.3, 10.5, 13.6, 18.3, 25.2, 36.1, 54.0]
-];
-function xtValue(x, y) {
-  const col = Math.max(0, Math.min(11, Math.floor((x || 0) / 10)));
-  const row = Math.max(0, Math.min(7, Math.floor((y || 0) / 10)));
-  return XT_GRID[row][col] / 100;
+function rowHalf(row, c) {
+  if (c.period >= 0) { const p = parseInt(row[c.period]); if (p === 2) return 2; if (p === 1) return 1; }
+  const m = parseFloat(row[c.minute]);
+  return m > 45 ? 2 : 1;
 }
-function eventThreatContribution(row, c) {
-  // per-event attacking threat; scales tuned so shots dominate (like The Analyst)
+function getTeamFlip(team) {
+  // detect attacking direction per half; flip 2nd half coords if team attacks -x then
+  const c = getMomentumCols();
+  const sums = { 1: [0, 0], 2: [0, 0] };
+  for (let i = 1; i < rawData.length; i++) {
+    const row = rawData[i];
+    if (String(row[c.team] || '').trim() !== team) continue;
+    const hx = c.endX >= 0 ? parseFloat(row[c.endX]) : (c.x >= 0 ? parseFloat(row[c.x]) : NaN);
+    if (isNaN(hx)) continue;
+    const half = rowHalf(row, c);
+    if (half === 1 || half === 2) { sums[half][0] += hx; sums[half][1]++; }
+  }
+  if (sums[1][1] < 5 || sums[2][1] < 5) return false;
+  return (sums[2][0] / sums[2][1]) < (sums[1][0] / sums[1][1]) - 8;
+}
+function fx(v, flip) { return flip ? 120 - v : v; }
+function eventThreatContribution(row, c, flip) {
   const et = c.event >= 0 ? String(row[c.event] || '').toLowerCase() : '';
   const truthy = function (v) { return v === true || v === 'true' || v === '1' || v === 1; };
   const xg = c.xg >= 0 ? parseFloat(row[c.xg]) || 0 : 0;
-  const sx = c.x >= 0 ? parseFloat(row[c.x]) || 0 : 0;
-  const ex = c.endX >= 0 ? parseFloat(row[c.endX]) || 0 : 0;
+  const sx = c.x >= 0 ? fx(parseFloat(row[c.x]) || 0, flip) : 0;
+  const sy = c.y >= 0 ? (parseFloat(row[c.y]) || 0) : 40;
+  const ex = c.endX >= 0 ? fx(parseFloat(row[c.endX]) || 0, flip) : 0;
+  const ey = c.endY >= 0 ? (parseFloat(row[c.endY]) || 0) : 40;
   let t = 0;
-  const sy = c.endY >= 0 || c.x >= 0 ? (c.x >= 0 ? parseFloat(row[c.x === c.endX ? c.x : c.x]) || 0 : 0) : 0;
-  const ey = c.endY >= 0 ? parseFloat(row[c.endY]) || 0 : 40;
-  const syVal = c.x >= 0 ? parseFloat(row[c.x === undefined ? -1 : c.x]) || 0 : 0;
-  const startY = c.x >= 0 && c.x !== c.endX ? (parseFloat(row[c.x]) || 0, parseFloat(row[c.x]) || 0) : 0;
-  const xtStart = c.x >= 0 ? xtValue(parseFloat(row[c.x]) || 0, c.endY >= 0 && c.x === c.endY ? (parseFloat(row[c.endY]) || 0) : 40) : 0;
-  const xtEnd = (c.endX >= 0 && c.endY >= 0) ? xtValue(ex, parseFloat(row[c.endY]) || 0) : 0;
   if (et.includes('shot')) {
     t += xg > 0 ? 15 + xg * 55 : 6;
     if (c.outcome >= 0 && String(row[c.outcome]).toLowerCase() === 'goal') t += 10;
@@ -2124,36 +2126,32 @@ function eventThreatContribution(row, c) {
   if (c.shotType >= 0 && String(row[c.shotType] || '') !== '' && !et.includes('shot')) t += xg > 0 ? 15 + xg * 55 : 6;
   if (c.goalAssist >= 0 && truthy(row[c.goalAssist])) t += 7;
   else if (c.shotAssist >= 0 && truthy(row[c.shotAssist])) t += 3.5;
-  if ((et.includes('pass') || et.includes('carry')) && String(row[c.outcome] || '').toLowerCase() === 'complete' && xtEnd > xtStart) {
-    t += (xtEnd - xtStart) * 9;
+  if ((et.includes('pass') || et.includes('carry')) && String(row[c.outcome] || '').toLowerCase() === 'complete') {
+    const gain = xtValue(ex, ey) - xtValue(sx, sy);
+    if (gain > 0) t += gain * 9;
   }
-  if (et.includes('dribble') && String(row[c.outcome] || '').toLowerCase() === 'complete' && sx >= 55) {
-    t += xtValue(sx, 40) * 3;
-  }
-  if (et.includes('ball receipt') && sx >= 85) t += xtValue(sx, 40) * 2;
+  if (et.includes('dribble') && String(row[c.outcome] || '').toLowerCase() === 'complete' && sx >= 55) t += xtValue(sx, sy) * 3;
+  if (et.includes('ball receipt') && sx >= 85) t += xtValue(sx, sy) * 2;
   if (et.includes('foul won') && sx >= 60) t += 0.5;
   return t;
 }
 function getTeamThreatMap(team) {
   const c = getMomentumCols();
+  const flip = getTeamFlip(team);
   const map = {};
   for (let i = 1; i < rawData.length; i++) {
     const row = rawData[i];
     if (String(row[c.team] || '').trim() !== team) continue;
     const minute = parseFloat(row[c.minute]);
-    if (isNaN(minute)) continue;
+    if (isNaN(minute) || minute > 90) continue; // 90 minutes only - no extra time / shootout
     let t = 0;
-    if (c.threat >= 0) {
-      t = parseFloat(row[c.threat]) || 0;
-    } else {
-      t = eventThreatContribution(row, c);
-    }
+    if (c.threat >= 0) t = parseFloat(row[c.threat]) || 0;
+    else t = eventThreatContribution(row, c, flip);
     if (t !== 0) map[minute] = (map[minute] || 0) + t;
   }
   return map;
 }
 function smoothThreat(map, maxMinute) {
-  // exponential moving average -> decaying hills like The Analyst
   const series = [];
   let ema = 0;
   for (let m = 0; m <= maxMinute; m++) {
@@ -2193,12 +2191,7 @@ function drawMomentum() {
   const teamA = momTeamASelect.value, teamB = momTeamBSelect.value;
   if (!teamA) { drawTextCtx(c2, 'Select a team from the dropdown', Wm / 2, Hm / 2, '#999', 'bold 24px sans-serif'); return; }
 
-  const c = getMomentumCols();
-  let maxMinute = 90;
-  for (let i = 1; i < rawData.length; i++) {
-    const mm = parseFloat(rawData[i][c.minute]);
-    if (!isNaN(mm) && mm > maxMinute) maxMinute = Math.ceil(mm);
-  }
+  const maxMinute = 90;
   const sA = smoothThreat(getTeamThreatMap(teamA), maxMinute);
   const sB = teamB ? smoothThreat(getTeamThreatMap(teamB), maxMinute) : null;
   let maxV = 1;
