@@ -1076,7 +1076,12 @@ function loadData(data, sourceName) {
       return;
     }
     const teams = [];
-    rawData.slice(1).forEach(r => { const t = String(r[tI] || '').trim(); if (t && !isNaN(parseFloat(r[mI])) && !isNaN(parseFloat(r[thI])) && !teams.includes(t)) teams.push(t); });
+    rawData.slice(1).forEach(r => {
+      const t = String(r[tI] || '').trim();
+      if (!t || teams.includes(t) || isNaN(parseFloat(r[mI]))) return;
+      if (thI >= 0 && isNaN(parseFloat(r[thI]))) return;
+      teams.push(t);
+    });
     momTeamASelect.innerHTML = '<option value="">None</option>';
     momTeamBSelect.innerHTML = '<option value="">None</option>';
     teams.forEach(t => { momTeamASelect.add(new Option(t, t)); momTeamBSelect.add(new Option(t, t)); });
