@@ -2208,21 +2208,34 @@ function drawMomentum() {
   if (!teamA) { drawTextCtx(c2, 'Select a team from the dropdown', Wm / 2, Hm / 2, '#999', 'bold 24px sans-serif'); return; }
 
   const maxMinute = 90;
-  const sA = smoothThreat(getTeamThreatMap(teamA), maxMinute);
-  const sB = teamB ? smoothThreat(getTeamThreatMap(teamB), maxMinute) : null;
-  let maxV = 1;
-  sA.forEach(function (v) { if (v > maxV) maxV = v; });
-  if (sB) sB.forEach(function (v) { if (v > maxV) maxV = v; });
-  const yMax = Math.max(1, Math.ceil(maxV * 1.15));
+  function clipMap(map) {
+    const vals = Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return a - b; });
+    if (!vals.length) return map;
+    const cap = vals[Math.floor(vals.length * 0.95)] || 1;
+    const out = {};
+    Object.keys(map).forEach(function (k) { out[k] = Math.min(map[k], cap); });
+    return out;
+  }
+  const emaA = smoothThreat(clipMap(getTeamThreatMap(teamA)), maxMinute);
+  let diff;
+  if (teamB) {
+    const emaB = smoothThreat(clipMap(getTeamThreatMap(teamB)), maxMinute);
+    diff = emaA.map(function (v, m) { return v - emaB[m]; });
+  } else { diff = emaA; }
+  const series = diff.map(function (v, m) {
+    const a = m > 0 ? diff[m - 1] : v;
+    const b = m < diff.length - 1 ? diff[m + 1] : v;
+    return (a + v + b) / 3;
+  });
+  let maxAbs = 1;
+  series.forEach(function (v) { const a = Math.abs(v); if (a > maxAbs) maxAbs = a; });
+  const yMax = Math.max(1, Math.ceil(maxAbs * 1.15));
 
   const padL = 150, padR = 40, padT = 80, padB = 70;
   const plotW = Wm - padL - padR, plotH = Hm - padT - padB;
   const xToPx = function (m) { return padL + (m / maxMinute) * plotW; };
   const zeroY = padT + plotH / 2;
-  const yToPx = function (v, isA) {
-    const half = plotH / 2 - 10;
-    return isA ? zeroY - (v / yMax) * half : zeroY + (v / yMax) * half;
-  };
+  const yD = function (v) { return zeroY - (v / yMax) * (plotH / 2 - 10); };
 
   // title + halves
   drawTextCtx(c2, 'Match Momentum', padL, 24, '#111', 'bold 24px sans-serif', 'left', 'middle');
@@ -2243,10 +2256,10 @@ function drawMomentum() {
 
   // y ticks
   c2.textAlign = 'right'; c2.textBaseline = 'middle'; c2.font = 'bold 12px sans-serif'; c2.fillStyle = '#666';
-  c2.fillText(yMax.toFixed(1), padL - 8, padT + 10);
-  c2.fillText((yMax / 2).toFixed(1), padL - 8, zeroY - (plotH / 2 - 10) / 2);
-  c2.fillText((yMax / 2).toFixed(1), padL - 8, zeroY + (plotH / 2 - 10) / 2);
-  c2.fillText(yMax.toFixed(1), padL - 8, padT + plotH - 10);
+  c2.fillText('+' + yMax.toFixed(1), padL - 8, padT + 10);
+  c2.fillText('+' + (yMax / 2).toFixed(1), padL - 8, zeroY - (plotH / 2 - 10) / 2);
+  c2.fillText('-' + (yMax / 2).toFixed(1), padL - 8, zeroY + (plotH / 2 - 10) / 2);
+  c2.fillText('-' + yMax.toFixed(1), padL - 8, padT + plotH - 10);
   // rotated axis title
   c2.save(); c2.translate(26, zeroY); c2.rotate(-Math.PI / 2);
   c2.textAlign = 'center'; c2.fillStyle = '#444'; c2.font = 'bold 14px sans-serif';
@@ -2258,23 +2271,39 @@ function drawMomentum() {
     c2.beginPath(); c2.moveTo(xToPx(45), padT - 8); c2.lineTo(xToPx(45), padT + plotH); c2.stroke(); c2.restore();
   }
 
-  // areas
-  function drawArea(series, isA) {
+  // single difference series: crosses zero, lobes coloured by who's dominant
+  function crossX(m, v1, v2) {
+    const t = v1 / (v1 - v2);
+    return xToPx(m) + t * (xToPx(m + 1) - xToPx(m));
+  }
+  function fillSide(positive) {
     c2.beginPath();
     c2.moveTo(xToPx(0), zeroY);
-    series.forEach(function (v, m) { c2.lineTo(xToPx(m), yToPx(v, isA)); });
+    for (let m = 0; m <= maxMinute; m++) {
+      const v = series[m];
+      if (positive ? v >= 0 : v <= 0) c2.lineTo(xToPx(m), yD(v));
+      else {
+        if (m > 0 && (positive ? series[m - 1] > 0 : series[m - 1] < 0)) c2.lineTo(crossX(m - 1, series[m - 1], v), zeroY);
+        c2.lineTo(xToPx(m), zeroY);
+      }
+    }
     c2.lineTo(xToPx(maxMinute), zeroY);
     c2.closePath();
-    c2.globalAlpha = 0.7;
-    c2.fillStyle = isA ? colorA1 : colorB1;
+    c2.globalAlpha = 0.75;
+    c2.fillStyle = positive ? colorA1 : colorB1;
     c2.fill();
     c2.globalAlpha = 1;
-    c2.beginPath();
-    series.forEach(function (v, m) { if (m === 0) c2.moveTo(xToPx(m), yToPx(v, isA)); else c2.lineTo(xToPx(m), yToPx(v, isA)); });
-    c2.strokeStyle = isA ? colorA1 : colorB1; c2.lineWidth = 2; c2.stroke();
   }
-  if (sB) drawArea(sB, false);
-  drawArea(sA, true);
+  fillSide(false);
+  fillSide(true);
+  for (let m = 0; m < maxMinute; m++) {
+    c2.beginPath();
+    c2.moveTo(xToPx(m), yD(series[m]));
+    c2.lineTo(xToPx(m + 1), yD(series[m + 1]));
+    c2.strokeStyle = series[m] >= 0 ? colorA1 : colorB1;
+    c2.lineWidth = 2;
+    c2.stroke();
+  }
 
   // zero line
   c2.strokeStyle = '#333333'; c2.lineWidth = 2;
