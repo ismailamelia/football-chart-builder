@@ -2291,6 +2291,17 @@ function drawMomentum() {
     c2.beginPath(); c2.moveTo(xToPx(45), padT - 8); c2.lineTo(xToPx(45), padT + plotH); c2.stroke(); c2.restore();
   }
 
+  // dotted 15-minute gridlines behind the flow
+  c2.save();
+  c2.setLineDash([2, 5]);
+  c2.strokeStyle = '#dddddd'; c2.lineWidth = 1;
+  [0, 15, 30, 45, 60, 75, 90].forEach(function (t) {
+    if (t <= maxMinute) {
+      c2.beginPath(); c2.moveTo(xToPx(t), padT); c2.lineTo(xToPx(t), padT + plotH); c2.stroke();
+    }
+  });
+  c2.restore();
+
   // single difference series: crosses zero, lobes coloured by who's dominant
   function crossX(m, v1, v2) {
     const t = v1 / (v1 - v2);
@@ -2309,7 +2320,7 @@ function drawMomentum() {
     }
     c2.lineTo(xToPx(maxMinute), zeroY);
     c2.closePath();
-    c2.globalAlpha = 0.75;
+    c2.globalAlpha = 0.25;
     c2.fillStyle = positive ? colorA1 : colorB1;
     c2.fill();
     c2.globalAlpha = 1;
@@ -2338,8 +2349,15 @@ function drawMomentum() {
     else { c2.moveTo(gx, zeroY); c2.lineTo(gx, padT + plotH - 32); }
     c2.stroke();
     c2.globalAlpha = 1;
+    // soccer ball: club-colored disc + white patches
     c2.beginPath(); c2.arc(gx, gy, 11, 0, Math.PI * 2); c2.fillStyle = col; c2.fill();
-    c2.beginPath(); c2.arc(gx, gy, 5.5, 0, Math.PI * 2); c2.fillStyle = '#ffffff'; c2.fill();
+    c2.strokeStyle = 'rgba(0,0,0,0.25)'; c2.lineWidth = 1; c2.stroke();
+    c2.fillStyle = '#ffffff';
+    c2.beginPath(); c2.arc(gx, gy, 3.2, 0, Math.PI * 2); c2.fill();
+    for (let k = 0; k < 5; k++) {
+      const ang = -Math.PI / 2 + k * (Math.PI * 2 / 5);
+      c2.beginPath(); c2.arc(gx + Math.cos(ang) * 6.4, gy + Math.sin(ang) * 6.4, 1.9, 0, Math.PI * 2); c2.fill();
+    }
     drawTextCtx(c2, minuteLabel(g.minute), gx + 16, gy, col, 'bold 13px sans-serif', 'left', 'middle');
   });
 
