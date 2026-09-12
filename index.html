@@ -1185,7 +1185,7 @@ function drawRadarInfoBlock(name, meta, colorMain, colorWeak, blockCx, context) 
   if (!name) return;
   meta = meta || {};
   const stripTop = 24;
-  drawTextCtx(ctx, (meta.club && meta.club !== '\u2014') ? meta.club : '', blockCx, stripTop + 18, '#333', 'bold 20px sans-serif');
+  drawTextCtx(c, (meta.club && meta.club !== '\u2014') ? meta.club : '', blockCx, stripTop + 18, '#333', 'bold 20px sans-serif');
   const logoR = 47, logoCy = stripTop + 100;
   let logoUrl = meta.clubLogo || '';
   if (!logoUrl && meta.club && meta.club !== '\u2014') logoUrl = getClubLogoUrl(meta.club) || '';
@@ -1207,7 +1207,7 @@ function drawRadarInfoBlock(name, meta, colorMain, colorWeak, blockCx, context) 
   c.beginPath(); c.arc(blockCx, logoCy, logoR, 0, Math.PI * 2); c.strokeStyle = '#bbb'; c.lineWidth = 2; c.stroke();
   if (!ready) {
     const initials = (meta.club || '?').split(' ').map(function (w) { return w[0]; }).join('').substring(0, 3).toUpperCase();
-    drawTextCtx(ctx, initials, blockCx, logoCy, '#888', 'bold 19px sans-serif');
+    drawTextCtx(c, initials, blockCx, logoCy, '#888', 'bold 19px sans-serif');
   }
   c.font = 'bold 27px sans-serif';
   const nameW = c.measureText(name).width;
@@ -1215,11 +1215,11 @@ function drawRadarInfoBlock(name, meta, colorMain, colorWeak, blockCx, context) 
   const startX = blockCx - (nameW + dotsGap) / 2;
   c.beginPath(); c.arc(startX + 7, nameY - 11, 10, 0, Math.PI * 2); c.fillStyle = colorMain; c.fill();
   c.beginPath(); c.arc(startX + 7, nameY + 11, 10, 0, Math.PI * 2); c.fillStyle = colorWeak; c.fill();
-  drawTextCtx(ctx, name, startX + dotsGap, nameY, '#111', 'bold 27px sans-serif', 'left', 'middle');
+  drawTextCtx(c, name, startX + dotsGap, nameY, '#111', 'bold 27px sans-serif', 'left', 'middle');
   const pos = (meta.position && meta.position !== '\u2014') ? meta.position : '';
   const nat = (meta.nationality && meta.nationality !== '\u2014') ? meta.nationality : '';
   const info = pos && nat ? pos + '  \u2022  ' + nat : (pos || nat);
-  drawTextCtx(ctx, info, blockCx, nameY + 30, '#666', '18px sans-serif');
+  drawTextCtx(c, info, blockCx, nameY + 30, '#666', '18px sans-serif');
 }
 function drawRadar() {
   if (!rawData || currentChart !== 'radar') return;
@@ -1986,7 +1986,9 @@ function drawBarComp() {
     const y = y0 + rowH * (i + 0.5);
     const vA = Math.abs(getPlayerParamValue(pA, param));
     const vB = dual ? Math.abs(getPlayerParamValue(pB, param)) : 0;
-    const maxV = Math.max(vA, vB, 0.0001);
+    let colMax = 0.0001;
+    playerNames.forEach(function (pn) { colMax = Math.max(colMax, Math.abs(getPlayerParamValue(pn, param))); });
+    const maxV = colMax;
     const wA = vA > 0 ? Math.max(6, Math.min(halfMax, vA / maxV * halfMax)) : 0;
     const wB = vB > 0 ? Math.max(6, Math.min(halfMax, vB / maxV * halfMax)) : 0;
 
@@ -1998,9 +2000,17 @@ function drawBarComp() {
     c2.fillRect(cxb - halfMax - 8, y - barH / 2, halfMax + 8, barH);
     c2.fillRect(cxb, y - barH / 2, halfMax + 8, barH);
 
-    // bars
-    if (wA > 0) { c2.fillStyle = colorA1; c2.fillRect(cxb - wA, y - barH / 2, wA, barH); }
-    if (wB > 0) { c2.fillStyle = colorB1; c2.fillRect(cxb, y - barH / 2, wB, barH); }
+    // bars (gradient: weak color -> main color)
+    if (wA > 0) {
+      const gA = c2.createLinearGradient(cxb - wA, y, cxb, y);
+      gA.addColorStop(0, colorA2); gA.addColorStop(1, colorA1);
+      c2.fillStyle = gA; c2.fillRect(cxb - wA, y - barH / 2, wA, barH);
+    }
+    if (wB > 0) {
+      const gB = c2.createLinearGradient(cxb, y, cxb + wB, y);
+      gB.addColorStop(0, colorB2); gB.addColorStop(1, colorB1);
+      c2.fillStyle = gB; c2.fillRect(cxb, y - barH / 2, wB, barH);
+    }
 
     // center divider
     c2.strokeStyle = '#bbbbbb'; c2.lineWidth = 2;
