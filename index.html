@@ -83,6 +83,8 @@ select:hover, select:focus { border-color: #0066CC; }
 .passmap-controls.visible { display: flex; }
 .barcomp-controls { display: none; align-items: flex-start; gap: 14px; background: white; padding: 14px 18px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; width: 100%; max-width: 900px; flex-wrap: wrap; justify-content: center; overflow: visible; }
 .barcomp-controls.visible { display: flex; }
+.momentum-controls { display: none; align-items: flex-start; gap: 14px; background: white; padding: 14px 18px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; width: 100%; max-width: 900px; flex-wrap: wrap; justify-content: center; }
+.momentum-controls.visible { display: flex; }
 .team-logo-circle { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #222; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.6rem; color: #222; background: white; text-align: center; line-height: 1; }
 .canvas-wrap { display: none; background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); padding: 10px; margin-bottom: 20px; position: relative; overflow: hidden; width: 100%; max-width: 900px; }
 .canvas-wrap.visible { display: block; }
@@ -184,6 +186,7 @@ canvas { display: block; width: 100%; height: auto; }
     <div class="chart-card" onclick="if(requirePremium())selectChart('xg')"><div class="icon">&#128200;</div><h3>Expected Goal (xG) Chart</h3><p>Track cumulative xG minute-by-minute for both teams with goal markers and a race timeline.</p></div>
     <div class="chart-card" onclick="if(requirePremium())selectChart('passmap')"><div class="icon">&#9917;</div><h3>Pass Map</h3><p>Plot every pass on the pitch with start &amp; end points - filter by corners, free kicks, final third and more.</p></div>
     <div class="chart-card" onclick="if(requirePremium())selectChart('barcomp')"><div class="icon">&#128202;</div><h3>Comparison Bars</h3><p>Compare two players or teams head-to-head on up to 10 metrics with diverging bars and badges.</p></div>
+    <div class="chart-card" onclick="if(requirePremium())selectChart('momentum')"><div class="icon">&#9889;</div><h3>Match Momentum</h3><p>Track attacking threat minute-by-minute - see which team dominated each phase.</p></div>
   </div>
 </div>
 
@@ -283,6 +286,16 @@ canvas { display: block; width: 100%; height: auto; }
       </div>
     </div>
   </div>
+  <div class="momentum-controls" id="momentumControls">
+    <div class="control-group"><label>Team A</label><select id="momTeamA"><option value="">None</option></select></div>
+    <div class="control-group"><label>Team A Color</label>
+      <div class="color-picker" id="momColorPickerA"><div class="color-picker-btn" id="momColorBtnA" style="background:#c41e1e;"></div><div class="color-picker-dropdown" id="momColorDropA"></div></div>
+    </div>
+    <div class="control-group"><label>Team B</label><select id="momTeamB"><option value="">None</option></select></div>
+    <div class="control-group"><label>Team B Color</label>
+      <div class="color-picker" id="momColorPickerB"><div class="color-picker-btn" id="momColorBtnB" style="background:#0066CC;"></div><div class="color-picker-dropdown" id="momColorDropB"></div></div>
+    </div>
+  </div>
   <div class="xg-controls" id="xgControls">
     <div class="control-group"><label>Team A</label><select id="xgTeamA"><option value="">None</option></select></div>
     <div class="control-group"><label>Team A Color</label>
@@ -343,6 +356,7 @@ canvas { display: block; width: 100%; height: auto; }
   <div class="canvas-wrap" id="xgCanvasWrap"><canvas id="xgCanvas" width="1200" height="800"></canvas></div>
   <div class="canvas-wrap" id="passmapCanvasWrap"><canvas id="passmapCanvas" width="1200" height="800"></canvas></div>
   <div class="canvas-wrap" id="barcompCanvasWrap"><canvas id="barcompCanvas" width="1200" height="1200"></canvas></div>
+  <div class="canvas-wrap" id="momentumCanvasWrap"><canvas id="momentumCanvas" width="1200" height="800"></canvas></div>
 </div>
 
 <script>
@@ -369,6 +383,9 @@ const passmapTeamSelect = document.getElementById('passmapTeam');
 const passmapPlayerSelect = document.getElementById('passmapPlayer');
 const passmapTypeSelect = document.getElementById('passmapType');
 const barcompCanvas = document.getElementById('barcompCanvas');
+const momentumCanvas = document.getElementById('momentumCanvas');
+const momTeamASelect = document.getElementById('momTeamA');
+const momTeamBSelect = document.getElementById('momTeamB');
 const barPlayerA = document.getElementById('barPlayerA');
 const barPlayerB = document.getElementById('barPlayerB');
 function lightenColor(hex, percent) {
@@ -777,6 +794,8 @@ function selectChart(chartType) {
   document.getElementById('xgCanvasWrap').classList.remove('visible');
   document.getElementById('passmapControls').classList.remove('visible');
   document.getElementById('barcompControls').classList.remove('visible');
+  document.getElementById('momentumControls').classList.remove('visible');
+  document.getElementById('momentumCanvasWrap').classList.remove('visible');
   document.getElementById('barcompCanvasWrap').classList.remove('visible');
   document.getElementById('passmapCanvasWrap').classList.remove('visible');
   document.getElementById('radarCanvasWrap').classList.remove('visible');
@@ -791,6 +810,7 @@ function selectChart(chartType) {
   else if (chartType === 'xg') uploadText.innerHTML = '<strong>Click to upload</strong> or drag &amp; drop<br>Supports <strong>.CSV</strong> and <strong>.Excel</strong> files<br><small>Required columns: team, minute, xg<br>Optional: is_goal, player, outcome, club_logo (team badge URL)<br>One row per shot / chance</small>';
   else if (chartType === 'passmap') uploadText.innerHTML = '<strong>Click to upload</strong> or drag &amp; drop<br>Supports <strong>.CSV</strong> and <strong>.Excel</strong> files<br><small>Required columns: player (or passer), start_x, start_y, end_x, end_y<br>Optional: team, type, successful / outcome, cross, switch, shot_assist, goal_assist, receiver<br>Coordinates on a 120x80 pitch scale</small>';
   else if (chartType === 'barcomp') uploadText.innerHTML = '<strong>Click to upload</strong> or drag &amp; drop<br>Supports <strong>.CSV</strong> and <strong>.Excel</strong> files<br><small>Format: rows = players or teams, columns = numeric parameters<br>Optional: Club, Position, Nationality, ClubLogo (for badges)</small>';
+  else if (chartType === 'momentum') uploadText.innerHTML = '<strong>Click to upload</strong> or drag &amp; drop<br>Supports <strong>.CSV</strong> and <strong>.Excel</strong> files<br><small>Format A (ready threat): team, minute, threat<br>Format B (raw events): Team, Minute, Event_Type, X, End_X, xG - threat is computed automatically<br>Optional: club_logo (badge URL)</small>';
   fileInfo.classList.remove('show', 'error');
 }
 function goBack() {
@@ -1045,6 +1065,27 @@ function loadData(data, sourceName) {
     document.getElementById('barcompControls').classList.add('visible');
     document.getElementById('barcompCanvasWrap').classList.add('visible');
     drawBarComp();
+  } else if (currentChart === 'momentum') {
+    const lowerH = headers.map(h => String(h).toLowerCase().trim());
+    const tI = lowerH.indexOf('team');
+    const mI = lowerH.findIndex(h => h === 'minute' || h === 'min');
+    const thI = lowerH.findIndex(h => ['threat', 'momentum', 'value', 'attacking_threat'].includes(h));
+    if (tI < 0 || mI < 0) {
+      fileInfo.textContent = 'Error: Missing required columns (team, minute, threat). Found: ' + headers.join(', ');
+      fileInfo.classList.add('error'); fileInfo.classList.add('show');
+      return;
+    }
+    const teams = [];
+    rawData.slice(1).forEach(r => { const t = String(r[tI] || '').trim(); if (t && !isNaN(parseFloat(r[mI])) && !isNaN(parseFloat(r[thI])) && !teams.includes(t)) teams.push(t); });
+    momTeamASelect.innerHTML = '<option value="">None</option>';
+    momTeamBSelect.innerHTML = '<option value="">None</option>';
+    teams.forEach(t => { momTeamASelect.add(new Option(t, t)); momTeamBSelect.add(new Option(t, t)); });
+    if (teams.length >= 1) momTeamASelect.value = teams[0];
+    if (teams.length >= 2) momTeamBSelect.value = teams[1];
+    fileInfo.classList.remove('show', 'error');
+    document.getElementById('momentumControls').classList.add('visible');
+    document.getElementById('momentumCanvasWrap').classList.add('visible');
+    drawMomentum();
   } else if (currentChart === 'scatter') {
     populateScatterDropdowns();
     if (paramNames.length >= 2) { scatterX.value = paramNames[0]; scatterY.value = paramNames[1]; }
@@ -2022,6 +2063,215 @@ function drawBarComp() {
   });
 }
 
+/* ================= MATCH MOMENTUM ================= */
+function getMomentumCols() {
+  const h = headers.map(function (x) { return String(x).toLowerCase().trim(); });
+  const find = function (names) { for (let k = 0; k < names.length; k++) { const i = h.indexOf(names[k]); if (i >= 0) return i; } return -1; };
+  return {
+    team: find(['team', 'club']),
+    minute: find(['minute', 'min']),
+    threat: find(['threat', 'momentum', 'value', 'attacking_threat']),
+    event: find(['event_type', 'event', 'type', 'action']),
+    x: find(['x']),
+    endX: find(['end_x']),
+    endY: find(['end_y']),
+    xg: find(['xg']),
+    shotType: find(['shot_type']),
+    outcome: find(['outcome']),
+    shotAssist: find(['shot_assist', 'is_shot_assist', 'key_pass']),
+    goalAssist: find(['goal_assist', 'is_goal_assist', 'assist'])
+  };
+}
+// Public-domain style xT grid (12 cols x 8 rows, attacking toward +X), values ~ x100
+const XT_GRID = [
+  [0.6, 0.8, 0.8, 0.9, 1.1, 1.3, 1.5, 1.7, 2.0, 2.4, 2.9, 3.7],
+  [0.7, 0.9, 0.9, 1.0, 1.2, 1.4, 1.7, 1.9, 2.3, 2.7, 3.3, 4.4],
+  [0.9, 1.0, 1.1, 1.2, 1.4, 1.7, 2.0, 2.4, 2.9, 3.5, 4.4, 5.9],
+  [1.1, 1.3, 1.4, 1.6, 1.9, 2.3, 2.7, 3.3, 4.1, 5.1, 6.5, 8.8],
+  [1.4, 1.6, 1.8, 2.1, 2.5, 3.0, 3.7, 4.5, 5.7, 7.3, 9.6, 13.4],
+  [1.9, 2.1, 2.4, 2.8, 3.4, 4.2, 5.1, 6.4, 8.2, 10.8, 14.7, 21.0],
+  [2.6, 2.9, 3.3, 3.9, 4.8, 5.9, 7.4, 9.5, 12.5, 16.9, 23.6, 35.3],
+  [3.7, 4.1, 4.6, 5.4, 6.7, 8.3, 10.5, 13.6, 18.3, 25.2, 36.1, 54.0]
+];
+function xtValue(x, y) {
+  const col = Math.max(0, Math.min(11, Math.floor((x || 0) / 10)));
+  const row = Math.max(0, Math.min(7, Math.floor((y || 0) / 10)));
+  return XT_GRID[row][col] / 100;
+}
+function eventThreatContribution(row, c) {
+  // per-event attacking threat; scales tuned so shots dominate (like The Analyst)
+  const et = c.event >= 0 ? String(row[c.event] || '').toLowerCase() : '';
+  const truthy = function (v) { return v === true || v === 'true' || v === '1' || v === 1; };
+  const xg = c.xg >= 0 ? parseFloat(row[c.xg]) || 0 : 0;
+  const sx = c.x >= 0 ? parseFloat(row[c.x]) || 0 : 0;
+  const ex = c.endX >= 0 ? parseFloat(row[c.endX]) || 0 : 0;
+  let t = 0;
+  const sy = c.endY >= 0 || c.x >= 0 ? (c.x >= 0 ? parseFloat(row[c.x === c.endX ? c.x : c.x]) || 0 : 0) : 0;
+  const ey = c.endY >= 0 ? parseFloat(row[c.endY]) || 0 : 40;
+  const syVal = c.x >= 0 ? parseFloat(row[c.x === undefined ? -1 : c.x]) || 0 : 0;
+  const startY = c.x >= 0 && c.x !== c.endX ? (parseFloat(row[c.x]) || 0, parseFloat(row[c.x]) || 0) : 0;
+  const xtStart = c.x >= 0 ? xtValue(parseFloat(row[c.x]) || 0, c.endY >= 0 && c.x === c.endY ? (parseFloat(row[c.endY]) || 0) : 40) : 0;
+  const xtEnd = (c.endX >= 0 && c.endY >= 0) ? xtValue(ex, parseFloat(row[c.endY]) || 0) : 0;
+  if (et.includes('shot')) {
+    t += xg > 0 ? 15 + xg * 55 : 6;
+    if (c.outcome >= 0 && String(row[c.outcome]).toLowerCase() === 'goal') t += 10;
+  }
+  if (c.shotType >= 0 && String(row[c.shotType] || '') !== '' && !et.includes('shot')) t += xg > 0 ? 15 + xg * 55 : 6;
+  if (c.goalAssist >= 0 && truthy(row[c.goalAssist])) t += 7;
+  else if (c.shotAssist >= 0 && truthy(row[c.shotAssist])) t += 3.5;
+  if ((et.includes('pass') || et.includes('carry')) && String(row[c.outcome] || '').toLowerCase() === 'complete' && xtEnd > xtStart) {
+    t += (xtEnd - xtStart) * 9;
+  }
+  if (et.includes('dribble') && String(row[c.outcome] || '').toLowerCase() === 'complete' && sx >= 55) {
+    t += xtValue(sx, 40) * 3;
+  }
+  if (et.includes('ball receipt') && sx >= 85) t += xtValue(sx, 40) * 2;
+  if (et.includes('foul won') && sx >= 60) t += 0.5;
+  return t;
+}
+function getTeamThreatMap(team) {
+  const c = getMomentumCols();
+  const map = {};
+  for (let i = 1; i < rawData.length; i++) {
+    const row = rawData[i];
+    if (String(row[c.team] || '').trim() !== team) continue;
+    const minute = parseFloat(row[c.minute]);
+    if (isNaN(minute)) continue;
+    let t = 0;
+    if (c.threat >= 0) {
+      t = parseFloat(row[c.threat]) || 0;
+    } else {
+      t = eventThreatContribution(row, c);
+    }
+    if (t !== 0) map[minute] = (map[minute] || 0) + t;
+  }
+  return map;
+}
+function smoothThreat(map, maxMinute) {
+  // exponential moving average -> decaying hills like The Analyst
+  const series = [];
+  let ema = 0;
+  for (let m = 0; m <= maxMinute; m++) {
+    ema = (map[m] || 0) + ema * 0.82;
+    series.push(ema);
+  }
+  return series;
+}
+function drawMomSideLabel(c2, team, color, logoY, nameY, logoCy) {
+  const lx = 78;
+  const logoUrl = (teamLogos[team] || teamLogos[String(team).trim()] || getClubLogoUrl(team) || '');
+  let ready = false;
+  if (logoUrl) {
+    let img = radarLogoImgs[logoUrl];
+    if (!img) {
+      img = new Image(); img.referrerPolicy = 'no-referrer';
+      radarLogoImgs[logoUrl] = img;
+      img.onload = function () { if (currentChart === 'momentum') drawMomentum(); };
+      img.src = logoUrl;
+    }
+    if (img.complete && img.naturalWidth > 0) ready = true;
+    c2.save();
+    c2.beginPath(); c2.arc(lx, logoCy, 22, 0, Math.PI * 2); c2.closePath();
+    if (ready) { c2.clip(); c2.drawImage(img, lx - 22, logoCy - 22, 44, 44); }
+    else { c2.fillStyle = '#f0f0f0'; c2.fill(); }
+    c2.restore();
+    c2.beginPath(); c2.arc(lx, logoCy, 22, 0, Math.PI * 2); c2.strokeStyle = color; c2.lineWidth = 2; c2.stroke();
+  }
+  drawTextCtx(c2, team, lx, nameY, color, 'bold 18px sans-serif');
+  drawTextCtx(c2, 'more threatening', lx, nameY + 22, '#888888', '11px sans-serif');
+}
+function drawMomentum() {
+  if (!rawData || currentChart !== 'momentum') return;
+  const c2 = momentumCanvas.getContext('2d');
+  const Wm = momentumCanvas.width, Hm = momentumCanvas.height;
+  c2.fillStyle = '#ffffff'; c2.fillRect(0, 0, Wm, Hm);
+  const teamA = momTeamASelect.value, teamB = momTeamBSelect.value;
+  if (!teamA) { drawTextCtx(c2, 'Select a team from the dropdown', Wm / 2, Hm / 2, '#999', 'bold 24px sans-serif'); return; }
+
+  const c = getMomentumCols();
+  let maxMinute = 90;
+  for (let i = 1; i < rawData.length; i++) {
+    const mm = parseFloat(rawData[i][c.minute]);
+    if (!isNaN(mm) && mm > maxMinute) maxMinute = Math.ceil(mm);
+  }
+  const sA = smoothThreat(getTeamThreatMap(teamA), maxMinute);
+  const sB = teamB ? smoothThreat(getTeamThreatMap(teamB), maxMinute) : null;
+  let maxV = 1;
+  sA.forEach(function (v) { if (v > maxV) maxV = v; });
+  if (sB) sB.forEach(function (v) { if (v > maxV) maxV = v; });
+  const yMax = Math.max(1, Math.ceil(maxV * 1.15));
+
+  const padL = 150, padR = 40, padT = 80, padB = 70;
+  const plotW = Wm - padL - padR, plotH = Hm - padT - padB;
+  const xToPx = function (m) { return padL + (m / maxMinute) * plotW; };
+  const zeroY = padT + plotH / 2;
+  const yToPx = function (v, isA) {
+    const half = plotH / 2 - 10;
+    return isA ? zeroY - (v / yMax) * half : zeroY + (v / yMax) * half;
+  };
+
+  // title + halves
+  drawTextCtx(c2, 'Match Momentum', padL, 24, '#111', 'bold 24px sans-serif', 'left', 'middle');
+  drawTextCtx(c2, 'Attacking threat flow', padL, 48, '#888', '13px sans-serif', 'left', 'middle');
+  c2.fillStyle = '#c9c9c9'; c2.font = 'bold 18px sans-serif';
+  c2.textAlign = 'center'; c2.textBaseline = 'middle';
+  c2.fillText('FIRST HALF', padL + (Math.min(45, maxMinute) / maxMinute) * plotW / 2, padT - 18);
+  if (maxMinute > 45) c2.fillText('SECOND HALF', xToPx(45) + (padL + plotW - xToPx(45)) / 2, padT - 18);
+
+  // x ticks
+  c2.fillStyle = '#333'; c2.font = 'bold 12px sans-serif'; c2.textAlign = 'center'; c2.textBaseline = 'top';
+  [0, 15, 30, 45].forEach(function (t) { if (t <= maxMinute) c2.fillText(String(t), xToPx(t), padT + plotH + 10); });
+  if (maxMinute > 45) {
+    [60, 75, 90].forEach(function (t) { if (t <= maxMinute) c2.fillText(String(t), xToPx(t), padT + plotH + 10); });
+    if (maxMinute > 90) c2.fillText(String(maxMinute), xToPx(maxMinute), padT + plotH + 10);
+  }
+  drawTextCtx(c2, 'Minute', padL + plotW / 2, Hm - 20, '#111', 'bold 15px sans-serif');
+
+  // y ticks
+  c2.textAlign = 'right'; c2.textBaseline = 'middle'; c2.font = 'bold 12px sans-serif'; c2.fillStyle = '#666';
+  c2.fillText(yMax.toFixed(1), padL - 8, padT + 10);
+  c2.fillText((yMax / 2).toFixed(1), padL - 8, zeroY - (plotH / 2 - 10) / 2);
+  c2.fillText((yMax / 2).toFixed(1), padL - 8, zeroY + (plotH / 2 - 10) / 2);
+  c2.fillText(yMax.toFixed(1), padL - 8, padT + plotH - 10);
+  // rotated axis title
+  c2.save(); c2.translate(26, zeroY); c2.rotate(-Math.PI / 2);
+  c2.textAlign = 'center'; c2.fillStyle = '#444'; c2.font = 'bold 14px sans-serif';
+  c2.fillText('Attacking Threat', 0, 0); c2.restore();
+
+  // HT separator
+  if (maxMinute > 45) {
+    c2.save(); c2.setLineDash([8, 6]); c2.strokeStyle = '#bbb'; c2.lineWidth = 1.5;
+    c2.beginPath(); c2.moveTo(xToPx(45), padT - 8); c2.lineTo(xToPx(45), padT + plotH); c2.stroke(); c2.restore();
+  }
+
+  // areas
+  function drawArea(series, isA) {
+    c2.beginPath();
+    c2.moveTo(xToPx(0), zeroY);
+    series.forEach(function (v, m) { c2.lineTo(xToPx(m), yToPx(v, isA)); });
+    c2.lineTo(xToPx(maxMinute), zeroY);
+    c2.closePath();
+    c2.globalAlpha = 0.7;
+    c2.fillStyle = isA ? colorA1 : colorB1;
+    c2.fill();
+    c2.globalAlpha = 1;
+    c2.beginPath();
+    series.forEach(function (v, m) { if (m === 0) c2.moveTo(xToPx(m), yToPx(v, isA)); else c2.lineTo(xToPx(m), yToPx(v, isA)); });
+    c2.strokeStyle = isA ? colorA1 : colorB1; c2.lineWidth = 2; c2.stroke();
+  }
+  if (sB) drawArea(sB, false);
+  drawArea(sA, true);
+
+  // zero line
+  c2.strokeStyle = '#333333'; c2.lineWidth = 2;
+  c2.beginPath(); c2.moveTo(padL, zeroY); c2.lineTo(padL + plotW, zeroY); c2.stroke();
+  drawTextCtx(c2, 'Balanced', padL - 8, zeroY, '#888', '11px sans-serif', 'right', 'middle');
+
+  // team labels + logos OUTSIDE the chart (left of axis)
+  drawMomSideLabel(c2, teamA, colorA1, 0, padT + 30, padT + 78);
+  if (teamB) drawMomSideLabel(c2, teamB, colorB1, 0, padT + plotH - 70, padT + plotH - 26);
+}
+
 /* ================= XG RACE CHART ================= */
 function getXGTeams() {
   if (!rawData) return [];
@@ -2777,6 +3027,10 @@ initColorPicker('barColorPickerB1', 'barColorBtnB1', 'barColorDropB1', colorB1, 
 initColorPicker('barColorPickerB2', 'barColorBtnB2', 'barColorDropB2', colorB2, (c) => { colorB2 = c; if (currentChart === 'barcomp') drawBarComp(); });
 barPlayerA.addEventListener('change', () => { if (currentChart === 'barcomp') drawBarComp(); });
 barPlayerB.addEventListener('change', () => { if (currentChart === 'barcomp') drawBarComp(); });
+momTeamASelect.addEventListener('change', () => { if (currentChart === 'momentum') drawMomentum(); });
+momTeamBSelect.addEventListener('change', () => { if (currentChart === 'momentum') drawMomentum(); });
+initColorPicker('momColorPickerA', 'momColorBtnA', 'momColorDropA', colorA1, (c) => { colorA1 = c; if (currentChart === 'momentum') drawMomentum(); });
+initColorPicker('momColorPickerB', 'momColorBtnB', 'momColorDropB', colorB1, (c) => { colorB1 = c; if (currentChart === 'momentum') drawMomentum(); });
 scatterX.addEventListener('change', () => { if (currentChart === 'scatter') drawScatter(); });
 scatterY.addEventListener('change', () => { if (currentChart === 'scatter') drawScatter(); });
 scatterRankBy.addEventListener('change', () => { if (currentChart === 'scatter') drawScatter(); });
@@ -2793,6 +3047,7 @@ window.addEventListener('resize', () => {
   if (currentChart === 'xg') drawXGChart();
   if (currentChart === 'passmap') drawPassMap();
   if (currentChart === 'barcomp') drawBarComp();
+  if (currentChart === 'momentum') drawMomentum();
   if (currentChart === 'passing') updatePassingVisualization();
 });
 </script>
