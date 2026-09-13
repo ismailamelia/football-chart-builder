@@ -287,6 +287,7 @@ canvas { display: block; width: 100%; height: auto; }
     </div>
   </div>
   <div class="momentum-controls" id="momentumControls">
+    <div class="control-group"><label>Match</label><select id="momMatch"><option value="">All Matches</option></select></div>
     <div class="control-group"><label>Team A</label><select id="momTeamA"><option value="">None</option></select></div>
     <div class="control-group"><label>Team A Color</label>
       <div class="color-picker" id="momColorPickerA"><div class="color-picker-btn" id="momColorBtnA" style="background:#c41e1e;"></div><div class="color-picker-dropdown" id="momColorDropA"></div></div>
@@ -1087,6 +1088,14 @@ function loadData(data, sourceName) {
     teams.forEach(t => { momTeamASelect.add(new Option(t, t)); momTeamBSelect.add(new Option(t, t)); });
     if (teams.length >= 1) momTeamASelect.value = teams[0];
     if (teams.length >= 2) momTeamBSelect.value = teams[1];
+    const mColI = lowerH.findIndex(h => ['match', 'match_id', 'matchday', 'game', 'fixture', 'round'].includes(h));
+    const momMatchSel = document.getElementById('momMatch');
+    momMatchSel.innerHTML = '<option value="">All Matches</option>';
+    if (mColI >= 0) {
+      const seen = [];
+      rawData.slice(1).forEach(function (r) { const v = String(r[mColI] || '').trim(); if (v && !seen.includes(v)) { seen.push(v); momMatchSel.add(new Option(v, v)); } });
+      if (seen.length <= 1) momMatchSel.value = '';
+    }
     fileInfo.classList.remove('show', 'error');
     document.getElementById('momentumControls').classList.add('visible');
     document.getElementById('momentumCanvasWrap').classList.add('visible');
@@ -2075,6 +2084,7 @@ function getMomentumCols() {
   return {
     team: find(['team', 'club']),
     minute: find(['minute', 'min']),
+    match: find(['match', 'match_id', 'matchday', 'game', 'fixture', 'round']),
     period: find(['period', 'half']),
     threat: find(['threat', 'momentum', 'value', 'attacking_threat']),
     event: find(['event_type', 'event', 'type', 'action']),
@@ -2089,6 +2099,11 @@ function getMomentumCols() {
     goalAssist: find(['goal_assist', 'is_goal_assist', 'assist'])
   };
 }
+function momMatchOk(row, c) {
+  const sel = document.getElementById('momMatch').value;
+  if (!sel) return true;
+  return String(row[c.match] || '').trim() === sel;
+}
 function rowHalf(row, c) {
   if (c.period >= 0) { const p = parseInt(row[c.period]); if (p === 2) return 2; if (p === 1) return 1; }
   const m = parseFloat(row[c.minute]);
@@ -2101,6 +2116,7 @@ function getTeamFlip(team) {
   for (let i = 1; i < rawData.length; i++) {
     const row = rawData[i];
     if (String(row[c.team] || '').trim() !== team) continue;
+    if (!momMatchOk(row, c)) continue;
     const hx = c.endX >= 0 ? parseFloat(row[c.endX]) : (c.x >= 0 ? parseFloat(row[c.x]) : NaN);
     if (isNaN(hx)) continue;
     const half = rowHalf(row, c);
@@ -2158,6 +2174,7 @@ function getTeamThreatMap(team) {
   for (let i = 1; i < rawData.length; i++) {
     const row = rawData[i];
     if (String(row[c.team] || '').trim() !== team) continue;
+    if (!momMatchOk(row, c)) continue;
     const minute = parseFloat(row[c.minute]);
     if (isNaN(minute) || minute > 90) continue; // 90 minutes only - no extra time / shootout
     let t = 0;
@@ -2189,12 +2206,17 @@ function drawMomSideLabel(c2, team, color, logoY, nameY, logoCy) {
       img.src = logoUrl;
     }
     if (img.complete && img.naturalWidth > 0) ready = true;
-    c2.save();
-    c2.beginPath(); c2.arc(lx, logoCy, 22, 0, Math.PI * 2); c2.closePath();
-    if (ready) { c2.clip(); c2.drawImage(img, lx - 22, logoCy - 22, 44, 44); }
-    else { c2.fillStyle = '#f0f0f0'; c2.fill(); }
-    c2.restore();
-    c2.beginPath(); c2.arc(lx, logoCy, 22, 0, Math.PI * 2); c2.strokeStyle = color; c2.lineWidth = 2; c2.stroke();
+  }
+  // logo holder always visible under the name
+  c2.save();
+  c2.beginPath(); c2.arc(lx, logoCy, 22, 0, Math.PI * 2); c2.closePath();
+  if (ready) { c2.clip(); c2.drawImage(radarLogoImgs[logoUrl], lx - 22, logoCy - 22, 44, 44); }
+  else { c2.fillStyle = '#f0f0f0'; c2.fill(); }
+  c2.restore();
+  c2.beginPath(); c2.arc(lx, logoCy, 22, 0, Math.PI * 2); c2.strokeStyle = color; c2.lineWidth = 2; c2.stroke();
+  if (!ready) {
+    const initials = team.split(' ').map(function (w) { return w[0]; }).join('').substring(0, 3).toUpperCase();
+    drawTextCtx(c2, initials, lx, logoCy, '#888888', 'bold 12px sans-serif');
   }
   drawTextCtx(c2, team, lx, nameY, color, 'bold 18px sans-serif');
   drawTextCtx(c2, 'more threatening', lx, nameY + 22, '#888888', '11px sans-serif');
@@ -2206,6 +2228,7 @@ function getMomentumGoals() {
     const row = rawData[i];
     const team = String(row[c.team] || '').trim();
     if (!team) continue;
+    if (!momMatchOk(row, c)) continue;
     const minute = parseFloat(row[c.minute]);
     if (isNaN(minute) || minute > 90) continue;
     const et = c.event >= 0 ? String(row[c.event] || '').toLowerCase() : '';
@@ -3126,6 +3149,7 @@ initColorPicker('barColorPickerB1', 'barColorBtnB1', 'barColorDropB1', colorB1, 
 initColorPicker('barColorPickerB2', 'barColorBtnB2', 'barColorDropB2', colorB2, (c) => { colorB2 = c; if (currentChart === 'barcomp') drawBarComp(); });
 barPlayerA.addEventListener('change', () => { if (currentChart === 'barcomp') drawBarComp(); });
 barPlayerB.addEventListener('change', () => { if (currentChart === 'barcomp') drawBarComp(); });
+document.getElementById('momMatch').addEventListener('change', () => { if (currentChart === 'momentum') drawMomentum(); });
 momTeamASelect.addEventListener('change', () => { if (currentChart === 'momentum') drawMomentum(); });
 momTeamBSelect.addEventListener('change', () => { if (currentChart === 'momentum') drawMomentum(); });
 initColorPicker('momColorPickerA', 'momColorBtnA', 'momColorDropA', colorA1, (c) => { colorA1 = c; if (currentChart === 'momentum') drawMomentum(); });
