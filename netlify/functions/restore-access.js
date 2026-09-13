@@ -48,6 +48,20 @@ exports.handler = async (event) => {
     try { if (!email) email = (JSON.parse(event.body).email || "").toLowerCase().trim(); } catch (e) {}
   }
   const key = q.get("key") || "";
+  const device = (q.get("device") || "").trim();
+
+  // ADMIN RESET DEVICE: ?key=SECRET&reset_device=1&email=... (for support / new phone)
+  if (q.get("reset_device") === "1") {
+    if (key !== process.env.JOTFORM_SECRET) return { statusCode: 403, headers, body: JSON.stringify({ error: "forbidden" }) };
+    try {
+      const emails = await blobGet();
+      const rec = emails.find(function (e) { return e.email === email; });
+      if (!rec) return { statusCode: 404, headers, body: JSON.stringify({ error: "email not found" }) };
+      rec.device = "";
+      await blobSet(emails);
+      return { statusCode: 200, headers, body: JSON.stringify({ reset: true, email: email }) };
+    } catch (e) { return { statusCode: 500, headers, body: JSON.stringify({ error: String(e.message) }) }; }
+  }
 
   // ADMIN GRANT: ?key=SECRET&add=1&email=...
   if (q.get("add") === "1") {
@@ -57,7 +71,7 @@ exports.handler = async (event) => {
       const emails = await blobGet();
       const until = Date.now() + 31 * 24 * 3600 * 1000;
       const existing = emails.find(function (e) { return e.email === email; });
-      if (existing) { existing.until = until; } else { emails.push({ email: email, until: until }); }
+      if (existing) { existing.until = until; existing.device = ""; } else { emails.push({ email: email, until: until, device: "" }); }
       await blobSet(emails);
       return { statusCode: 200, headers, body: JSON.stringify({ granted: true, email: email, until: until }) };
     } catch (e) { return { statusCode: 500, headers, body: JSON.stringify({ error: String(e.message) }) }; }
@@ -80,7 +94,15 @@ exports.handler = async (event) => {
   try {
     const emails = await blobGet();
     const rec = emails.find(function (e) { return e.email === email; });
-    if (rec && rec.until > Date.now()) return { statusCode: 200, headers, body: JSON.stringify({ premium: true }) };
+    if (rec && rec.until > Date.now()) {
+      if (device) {
+        if (!rec.device) { rec.device = device; await blobSet(emails); }
+        else if (rec.device !== device) {
+          return { statusCode: 200, headers, body: JSON.stringify({ premium: false, reason: "device_mismatch" }) };
+        }
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ premium: true }) };
+    }
     return { statusCode: 200, headers, body: JSON.stringify({ premium: false }) };
   } catch (e) { return { statusCode: 500, headers, body: JSON.stringify({ error: String(e.message) }) }; }
 };
