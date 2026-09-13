@@ -1096,6 +1096,21 @@ function loadData(data, sourceName) {
       rawData.slice(1).forEach(function (r) { const v = String(r[mColI] || '').trim(); if (v && !seen.includes(v)) { seen.push(v); momMatchSel.add(new Option(v, v)); } });
       if (seen.length <= 1) momMatchSel.value = '';
     }
+    // scan whole sheet for club logo URLs (e.g. 'Club Name' + 'URL logo' columns on the events sheet)
+    const urlReMom = /^(https?:)?\/\/.+\..+/;
+    for (let i = 1; i < rawData.length; i++) {
+      const row = rawData[i] || [];
+      for (let j = 0; j < row.length; j++) {
+        let u = String(row[j] || '').trim().replace(/^["']+|["']+$/g, '');
+        if (u.match(/^\/\//)) u = 'https:' + u;
+        if (!urlReMom.test(u)) continue;
+        for (let k = 0; k < row.length; k++) {
+          if (k === j) continue;
+          const nm = String(row[k] || '').trim();
+          if (nm && !urlReMom.test(nm) && nm.length <= 40 && !teamLogos[nm]) { teamLogos[nm] = u; break; }
+        }
+      }
+    }
     fileInfo.classList.remove('show', 'error');
     document.getElementById('momentumControls').classList.add('visible');
     document.getElementById('momentumCanvasWrap').classList.add('visible');
