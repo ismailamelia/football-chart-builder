@@ -2209,14 +2209,14 @@ function drawMomSideLabel(c2, team, color, logoY, nameY, logoCy) {
   }
   // logo holder always visible under the name
   c2.save();
-  c2.beginPath(); c2.arc(lx, logoCy, 22, 0, Math.PI * 2); c2.closePath();
-  if (ready) { c2.clip(); c2.drawImage(radarLogoImgs[logoUrl], lx - 22, logoCy - 22, 44, 44); }
+  c2.beginPath(); c2.arc(lx, logoCy, 44, 0, Math.PI * 2); c2.closePath();
+  if (ready) { c2.clip(); c2.drawImage(radarLogoImgs[logoUrl], lx - 44, logoCy - 44, 88, 88); }
   else { c2.fillStyle = '#f0f0f0'; c2.fill(); }
   c2.restore();
-  c2.beginPath(); c2.arc(lx, logoCy, 22, 0, Math.PI * 2); c2.strokeStyle = color; c2.lineWidth = 2; c2.stroke();
+  c2.beginPath(); c2.arc(lx, logoCy, 44, 0, Math.PI * 2); c2.strokeStyle = color; c2.lineWidth = 2.5; c2.stroke();
   if (!ready) {
     const initials = team.split(' ').map(function (w) { return w[0]; }).join('').substring(0, 3).toUpperCase();
-    drawTextCtx(c2, initials, lx, logoCy, '#888888', 'bold 12px sans-serif');
+    drawTextCtx(c2, initials, lx, logoCy, '#888888', 'bold 22px sans-serif');
   }
   drawTextCtx(c2, team, lx, nameY, color, 'bold 18px sans-serif');
   drawTextCtx(c2, 'more threatening', lx, nameY + 22, '#888888', '11px sans-serif');
@@ -2390,8 +2390,8 @@ function drawMomentum() {
   drawTextCtx(c2, 'Balanced', padL - 8, zeroY, '#888', '11px sans-serif', 'right', 'middle');
 
   // team labels + logos OUTSIDE the chart (left of axis)
-  drawMomSideLabel(c2, teamA, colorA1, 0, padT + 30, padT + 78);
-  if (teamB) drawMomSideLabel(c2, teamB, colorB1, 0, padT + plotH - 70, padT + plotH - 26);
+  drawMomSideLabel(c2, teamA, colorA1, 0, padT + 28, padT + 118);
+  if (teamB) drawMomSideLabel(c2, teamB, colorB1, 0, padT + plotH - 28, padT + plotH - 118);
 }
 
 /* ================= XG RACE CHART ================= */
