@@ -176,6 +176,10 @@ canvas { display: block; width: 100%; height: auto; }
    onclick="logoutPremium()">
   Sign out
 </p>
+<p id="unsub-link" style="display:none; color: #c62828; font-size: 0.75rem; margin: -8px 0 12px; cursor: pointer; text-decoration: underline; text-align: center;"
+   onclick="unsubscribe()">
+  Unsubscribe
+</p>
   
 <div class="landing-page" id="landingPage">
   <div class="chart-options">
@@ -3202,6 +3206,7 @@ window.addEventListener('resize', () => {
       const data = await res.json();
       if (data.premium) {
         localStorage.setItem('fcb_premium', 'true');
+        localStorage.setItem('fcb_email', email);
         alert('Premium restored - welcome back!');
         location.reload();
       } else if (data.reason === 'device_mismatch') {
@@ -3217,6 +3222,19 @@ window.addEventListener('resize', () => {
   // 1b. Sign out
   function logoutPremium() {
     localStorage.removeItem('fcb_premium');
+    location.reload();
+  }
+
+  // 1c. Unsubscribe - remove access + log cancellation request
+  async function unsubscribe() {
+    let email = localStorage.getItem('fcb_email') || '';
+    if (!email) { email = (prompt('Confirm the email you subscribed with:') || '').trim(); }
+    if (!email || !email.includes('@')) { alert('Email needed to find your subscription.'); return; }
+    if (!confirm('Cancel your subscription? Your access ends immediately and your cancellation request is sent to stop monthly billing.')) return;
+    try { await fetch('/.netlify/functions/unsubscribe?email=' + encodeURIComponent(email)); } catch (e) {}
+    localStorage.removeItem('fcb_premium');
+    localStorage.removeItem('fcb_email');
+    alert('Subscription cancelled and access removed. Monthly billing will be stopped on our side. If any charge still appears, contact us with your email for an instant refund.');
     location.reload();
   }
 
@@ -3244,6 +3262,8 @@ if (isPremium()) {
   if (section) section.style.display = 'none';
   const lo = document.getElementById('logout-link');
   if (lo) lo.style.display = 'block';
+  const un = document.getElementById('unsub-link');
+  if (un) un.style.display = 'block';
 }
 </script>
 
