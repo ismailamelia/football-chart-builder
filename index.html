@@ -85,6 +85,8 @@ select:hover, select:focus { border-color: #0066CC; }
 .barcomp-controls.visible { display: flex; }
 .momentum-controls { display: none; align-items: flex-start; gap: 14px; background: white; padding: 14px 18px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; width: 100%; max-width: 900px; flex-wrap: wrap; justify-content: center; }
 .momentum-controls.visible { display: flex; }
+.teamperf-controls { display: none; align-items: flex-start; gap: 14px; background: white; padding: 14px 18px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; width: 100%; max-width: 900px; flex-wrap: wrap; justify-content: center; overflow: visible; }
+.teamperf-controls.visible { display: flex; }
 .team-logo-circle { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #222; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.6rem; color: #222; background: white; text-align: center; line-height: 1; }
 .canvas-wrap { display: none; background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); padding: 10px; margin-bottom: 20px; position: relative; overflow: hidden; width: 100%; max-width: 900px; }
 .canvas-wrap.visible { display: block; }
@@ -191,6 +193,7 @@ canvas { display: block; width: 100%; height: auto; }
     <div class="chart-card" onclick="if(requirePremium())selectChart('passmap')"><div class="icon">&#9917;</div><h3>Pass Map</h3><p>Plot every pass on the pitch with start &amp; end points - filter by corners, free kicks, final third and more.</p></div>
     <div class="chart-card" onclick="if(requirePremium())selectChart('barcomp')"><div class="icon">&#128202;</div><h3>Comparison Bars</h3><p>Compare two players or teams head-to-head on up to 10 metrics with diverging bars and badges.</p></div>
     <div class="chart-card" onclick="if(requirePremium())selectChart('momentum')"><div class="icon">&#9889;</div><h3>Match Momentum</h3><p>Track attacking threat minute-by-minute - see which team dominated each phase.</p></div>
+    <div class="chart-card" onclick="if(requirePremium())selectChart('teamperf')"><div class="icon">&#127942;</div><h3>Teams Performance</h3><p>Rank unlimited teams or players on a single parameter with badges, bars and percentages.</p></div>
   </div>
 </div>
 
@@ -301,6 +304,15 @@ canvas { display: block; width: 100%; height: auto; }
       <div class="color-picker" id="momColorPickerB"><div class="color-picker-btn" id="momColorBtnB" style="background:#0066CC;"></div><div class="color-picker-dropdown" id="momColorDropB"></div></div>
     </div>
   </div>
+  <div class="teamperf-controls" id="teamperfControls">
+    <div class="control-group"><label>Parameter</label><select id="teamPerfParam"></select></div>
+    <div class="control-group"><label>Bar Color</label>
+      <div class="color-picker" id="teamPerfColorPickerA"><div class="color-picker-btn" id="teamPerfColorBtnA" style="background:#c41e1e;"></div><div class="color-picker-dropdown" id="teamPerfColorDropA"></div></div>
+    </div>
+    <div class="control-group"><label>Gradient</label>
+      <div class="color-picker" id="teamPerfColorPickerA2"><div class="color-picker-btn" id="teamPerfColorBtnA2" style="background:#d4a017;"></div><div class="color-picker-dropdown" id="teamPerfColorDropA2"></div></div>
+    </div>
+  </div>
   <div class="xg-controls" id="xgControls">
     <div class="control-group"><label>Team A</label><select id="xgTeamA"><option value="">None</option></select></div>
     <div class="control-group"><label>Team A Color</label>
@@ -362,6 +374,7 @@ canvas { display: block; width: 100%; height: auto; }
   <div class="canvas-wrap" id="passmapCanvasWrap"><canvas id="passmapCanvas" width="1200" height="800"></canvas></div>
   <div class="canvas-wrap" id="barcompCanvasWrap"><canvas id="barcompCanvas" width="1200" height="1200"></canvas></div>
   <div class="canvas-wrap" id="momentumCanvasWrap"><canvas id="momentumCanvas" width="1200" height="800"></canvas></div>
+  <div class="canvas-wrap" id="teamperfCanvasWrap"><canvas id="teamPerfCanvas" width="1200" height="900"></canvas></div>
 </div>
 
 <script>
@@ -389,6 +402,8 @@ const passmapPlayerSelect = document.getElementById('passmapPlayer');
 const passmapTypeSelect = document.getElementById('passmapType');
 const barcompCanvas = document.getElementById('barcompCanvas');
 const momentumCanvas = document.getElementById('momentumCanvas');
+const teamPerfCanvas = document.getElementById('teamPerfCanvas');
+const teamPerfParamSelect = document.getElementById('teamPerfParam');
 const momTeamASelect = document.getElementById('momTeamA');
 const momTeamBSelect = document.getElementById('momTeamB');
 const barPlayerA = document.getElementById('barPlayerA');
@@ -800,6 +815,8 @@ function selectChart(chartType) {
   document.getElementById('passmapControls').classList.remove('visible');
   document.getElementById('barcompControls').classList.remove('visible');
   document.getElementById('momentumControls').classList.remove('visible');
+  document.getElementById('teamperfControls').classList.remove('visible');
+  document.getElementById('teamperfCanvasWrap').classList.remove('visible');
   document.getElementById('momentumCanvasWrap').classList.remove('visible');
   document.getElementById('barcompCanvasWrap').classList.remove('visible');
   document.getElementById('passmapCanvasWrap').classList.remove('visible');
@@ -816,6 +833,7 @@ function selectChart(chartType) {
   else if (chartType === 'passmap') uploadText.innerHTML = '<strong>Click to upload</strong> or drag &amp; drop<br>Supports <strong>.CSV</strong> and <strong>.Excel</strong> files<br><small>Required columns: player (or passer), start_x, start_y, end_x, end_y<br>Optional: team, type, successful / outcome, cross, switch, shot_assist, goal_assist, receiver<br>Coordinates on a 120x80 pitch scale</small>';
   else if (chartType === 'barcomp') uploadText.innerHTML = '<strong>Click to upload</strong> or drag &amp; drop<br>Supports <strong>.CSV</strong> and <strong>.Excel</strong> files<br><small>Format: rows = players or teams, columns = numeric parameters<br>Optional: Club, Position, Nationality, ClubLogo (for badges)</small>';
   else if (chartType === 'momentum') uploadText.innerHTML = '<strong>Click to upload</strong> or drag &amp; drop<br>Supports <strong>.CSV</strong> and <strong>.Excel</strong> files<br><small>Format A (ready threat): team, minute, threat<br>Format B (raw events): Team, Minute, Event_Type, X, End_X, xG - threat is computed automatically<br>Optional: club_logo (badge URL)</small>';
+  else if (chartType === 'teamperf') uploadText.innerHTML = '<strong>Click to upload</strong> or drag &amp; drop<br>Supports <strong>.CSV</strong> and <strong>.Excel</strong> files<br><small>Format: rows = teams or players, columns = numeric parameters<br>Pick one parameter - everyone gets ranked with badges and bars<br>Optional: Club, Position, Nationality, ClubLogo</small>';
   fileInfo.classList.remove('show', 'error');
 }
 function goBack() {
@@ -1119,6 +1137,14 @@ function loadData(data, sourceName) {
     document.getElementById('momentumControls').classList.add('visible');
     document.getElementById('momentumCanvasWrap').classList.add('visible');
     drawMomentum();
+  } else if (currentChart === 'teamperf') {
+    teamPerfParamSelect.innerHTML = '';
+    paramNames.forEach(function (p) { teamPerfParamSelect.add(new Option(p, p)); });
+    if (paramNames.length) teamPerfParamSelect.value = paramNames[0];
+    fileInfo.classList.remove('show', 'error');
+    document.getElementById('teamperfControls').classList.add('visible');
+    document.getElementById('teamperfCanvasWrap').classList.add('visible');
+    drawTeamPerf();
   } else if (currentChart === 'scatter') {
     populateScatterDropdowns();
     if (paramNames.length >= 2) { scatterX.value = paramNames[0]; scatterY.value = paramNames[1]; }
@@ -2413,6 +2439,80 @@ function drawMomentum() {
   if (teamB) drawMomSideLabel(c2, teamB, colorB1, 0, padT + plotH - 28, padT + plotH - 118);
 }
 
+/* ================= TEAMS PERFORMANCE ================= */
+function drawTeamPerf() {
+  if (!rawData || currentChart !== 'teamperf') return;
+  const cv = teamPerfCanvas;
+  const ctx2 = cv.getContext('2d');
+  const param = teamPerfParamSelect.value || paramNames[0];
+  const rows = [];
+  playerNames.forEach(function (name) {
+    const v = parseFloat(getPlayerParamValue(name, param));
+    if (!isNaN(v)) rows.push({ name: name, value: Math.round(v * 100) / 100, meta: getPlayerMeta(name) });
+  });
+  rows.sort(function (a, b) { return b.value - a.value; });
+  const n = rows.length;
+  const Wt = 1200;
+  const rowH = n ? Math.min(74, Math.max(42, Math.floor(1300 / n))) : 60;
+  const Ht = 128 + n * rowH + 24;
+  cv.width = Wt; cv.height = Ht;
+  ctx2.fillStyle = '#ffffff'; ctx2.fillRect(0, 0, Wt, Ht);
+
+  drawTextCtx(ctx2, 'Teams Performance', 40, 34, '#111111', 'bold 27px sans-serif', 'left', 'middle');
+  drawTextCtx(ctx2, 'Sorted by ' + param + ' - ' + n + ' teams', 40, 64, '#888888', '13px sans-serif', 'left', 'middle');
+  if (!n) { drawTextCtx(ctx2, 'No numeric data for this parameter', Wt / 2, Ht / 2, '#999999', 'bold 22px sans-serif'); return; }
+
+  const maxV = Math.max.apply(null, rows.map(function (r) { return Math.abs(r.value); }).concat([0.0001]));
+  const barX0 = 372, barX1 = Wt - 190, barMaxW = barX1 - barX0;
+
+  rows.forEach(function (r, i) {
+    const y = 106 + rowH * (i + 0.5);
+    const bh = Math.min(34, rowH * 0.5);
+    drawTextCtx(ctx2, String(i + 1), 40, y, '#999999', 'bold 20px sans-serif', 'left', 'middle');
+
+    // logo holder at the start of the row
+    const lx = 96;
+    let logoUrl = (r.meta && r.meta.clubLogo) || '';
+    if (!logoUrl && r.meta && r.meta.club && r.meta.club !== '\u2014') logoUrl = getClubLogoUrl(r.meta.club) || '';
+    let ready = false;
+    if (logoUrl) {
+      let img = radarLogoImgs[logoUrl];
+      if (!img) {
+        img = new Image(); img.referrerPolicy = 'no-referrer';
+        radarLogoImgs[logoUrl] = img;
+        img.onload = function () { if (currentChart === 'teamperf') drawTeamPerf(); };
+        img.src = logoUrl;
+      }
+      if (img.complete && img.naturalWidth > 0) ready = true;
+    }
+    ctx2.save();
+    ctx2.beginPath(); ctx2.arc(lx, y, 20, 0, Math.PI * 2); ctx2.closePath();
+    if (ready) { ctx2.clip(); ctx2.drawImage(radarLogoImgs[logoUrl], lx - 20, y - 20, 40, 40); }
+    else { ctx2.fillStyle = '#f0f0f0'; ctx2.fill(); }
+    ctx2.restore();
+    ctx2.beginPath(); ctx2.arc(lx, y, 20, 0, Math.PI * 2); ctx2.strokeStyle = '#dddddd'; ctx2.lineWidth = 1.5; ctx2.stroke();
+    if (!ready) {
+      const initials = r.name.split(' ').map(function (w) { return w[0]; }).join('').substring(0, 3).toUpperCase();
+      drawTextCtx(ctx2, initials, lx, y, '#888888', 'bold 10px sans-serif');
+    }
+
+    drawTextCtx(ctx2, r.name, 130, y, '#222222', 'bold 17px sans-serif', 'left', 'middle');
+
+    ctx2.fillStyle = '#ececec';
+    ctx2.fillRect(barX0, y - bh / 2, barMaxW, bh);
+    const w = Math.max(6, Math.abs(r.value) / maxV * barMaxW);
+    const g = ctx2.createLinearGradient(barX0, y, barX0 + w, y);
+    g.addColorStop(0, colorA2); g.addColorStop(1, colorA1);
+    ctx2.fillStyle = g;
+    roundRectPath(ctx2, barX0, y - bh / 2, w, bh, 4);
+    ctx2.fill();
+
+    const txt = String(r.value);
+    if (w > 76) drawTextCtx(ctx2, txt, barX0 + w - 10, y, '#ffffff', 'bold 16px sans-serif', 'right', 'middle');
+    else drawTextCtx(ctx2, txt, barX0 + w + 10, y, colorA1, 'bold 16px sans-serif', 'left', 'middle');
+  });
+}
+
 /* ================= XG RACE CHART ================= */
 function getXGTeams() {
   if (!rawData) return [];
@@ -3169,6 +3269,9 @@ initColorPicker('barColorPickerB2', 'barColorBtnB2', 'barColorDropB2', colorB2, 
 barPlayerA.addEventListener('change', () => { if (currentChart === 'barcomp') drawBarComp(); });
 barPlayerB.addEventListener('change', () => { if (currentChart === 'barcomp') drawBarComp(); });
 document.getElementById('momMatch').addEventListener('change', () => { if (currentChart === 'momentum') drawMomentum(); });
+teamPerfParamSelect.addEventListener('change', () => { if (currentChart === 'teamperf') drawTeamPerf(); });
+initColorPicker('teamPerfColorPickerA', 'teamPerfColorBtnA', 'teamPerfColorDropA', colorA1, (c) => { colorA1 = c; if (currentChart === 'teamperf') drawTeamPerf(); });
+initColorPicker('teamPerfColorPickerA2', 'teamPerfColorBtnA2', 'teamPerfColorDropA2', colorA2, (c) => { colorA2 = c; if (currentChart === 'teamperf') drawTeamPerf(); });
 momTeamASelect.addEventListener('change', () => { if (currentChart === 'momentum') drawMomentum(); });
 momTeamBSelect.addEventListener('change', () => { if (currentChart === 'momentum') drawMomentum(); });
 initColorPicker('momColorPickerA', 'momColorBtnA', 'momColorDropA', colorA1, (c) => { colorA1 = c; if (currentChart === 'momentum') drawMomentum(); });
@@ -3190,6 +3293,7 @@ window.addEventListener('resize', () => {
   if (currentChart === 'passmap') drawPassMap();
   if (currentChart === 'barcomp') drawBarComp();
   if (currentChart === 'momentum') drawMomentum();
+  if (currentChart === 'teamperf') drawTeamPerf();
   if (currentChart === 'passing') updatePassingVisualization();
 });
 </script>
