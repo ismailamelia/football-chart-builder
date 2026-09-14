@@ -2472,8 +2472,8 @@ function drawTeamPerf() {
     else { topNInput.value = rows.length; topN = rows.length; }
     topNVal.textContent = topN >= rows.length ? 'All (' + rows.length + ')' : String(topN);
   }
-  rows = rows.slice(0, topN);
-  const n = rows.length;
+  const shownRows = rows.slice(0, topN);
+  const n = shownRows.length;
   const Wt = 1200;
   const rowH = n ? Math.min(74, Math.max(42, Math.floor(1300 / n))) : 60;
   const Ht = 128 + n * rowH + 24;
@@ -2487,7 +2487,7 @@ function drawTeamPerf() {
   const maxV = fullMax;
   const barX0 = 372, barX1 = Wt - 190, barMaxW = barX1 - barX0;
 
-  rows.forEach(function (r, i) {
+  shownRows.forEach(function (r, i) {
     const y = 106 + rowH * (i + 0.5);
     const bh = Math.min(34, rowH * 0.5);
     drawTextCtx(ctx2, String(i + 1), 40, y, '#999999', 'bold 20px sans-serif', 'left', 'middle');
