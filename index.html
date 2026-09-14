@@ -312,6 +312,9 @@ canvas { display: block; width: 100%; height: auto; }
     <div class="control-group"><label>Gradient</label>
       <div class="color-picker" id="teamPerfColorPickerA2"><div class="color-picker-btn" id="teamPerfColorBtnA2" style="background:#d4a017;"></div><div class="color-picker-dropdown" id="teamPerfColorDropA2"></div></div>
     </div>
+    <div class="control-group" style="min-width:220px;"><label>Show Top <span id="teamPerfTopNVal">All</span></label>
+      <input type="range" id="teamPerfTopN" min="1" max="100" value="100" style="width:100%; accent-color:#0066CC; cursor:pointer;">
+    </div>
   </div>
   <div class="xg-controls" id="xgControls">
     <div class="control-group"><label>Team A</label><select id="xgTeamA"><option value="">None</option></select></div>
@@ -386,7 +389,10 @@ const RADAR_COLORS = [
   '#607D8B', '#FFC107', '#8BC34A', '#00BCD4', '#673AB7',
   '#FF9800', '#CDDC39', '#009688', '#3F51B5', '#FFEB3B',
   '#001F3F', '#DC143C', '#4B0082', '#FF6B6B', '#20B2AA',
-  '#FFD700', '#800000', '#32CD32', '#FF1493', '#A52A2A'
+  '#FFD700', '#800000', '#32CD32', '#FF1493', '#A52A2A',
+  '#C0C0C0', '#808080', '#556B2F', '#8B008B', '#2F4F4F',
+  '#483D8B', '#B8860B', '#006400', '#8B0000', '#5F9EA0',
+  '#D2691E', '#FF7F50', '#6495ED', '#DCB1C7', '#BDB76B'
 ];
 let colorA1 = '#c41e1e', colorA2 = '#d4a017', colorB1 = '#0066CC', colorB2 = '#87CEEB';
 let shootingTeamAColor = '#c41e1e', shootingTeamBColor = '#0066CC';
@@ -2451,6 +2457,22 @@ function drawTeamPerf() {
     if (!isNaN(v)) rows.push({ name: name, value: Math.round(v * 100) / 100, meta: getPlayerMeta(name) });
   });
   rows.sort(function (a, b) { return b.value - a.value; });
+  // Average across ALL teams for THIS parameter (before slicing)
+  let sumAll = 0;
+  rows.forEach(function (r) { sumAll += r.value; });
+  const avgAll = rows.length ? sumAll / rows.length : 0;
+  const fullMax = Math.max.apply(null, rows.map(function (r) { return Math.abs(r.value); }).concat([0.0001]));
+  // Top-N slicer
+  const topNInput = document.getElementById('teamPerfTopN');
+  const topNVal = document.getElementById('teamPerfTopNVal');
+  let topN = rows.length;
+  if (topNInput) {
+    topNInput.max = Math.max(rows.length, 1);
+    if (parseInt(topNInput.value) < rows.length) topN = parseInt(topNInput.value);
+    else { topNInput.value = rows.length; topN = rows.length; }
+    topNVal.textContent = topN >= rows.length ? 'All (' + rows.length + ')' : String(topN);
+  }
+  rows = rows.slice(0, topN);
   const n = rows.length;
   const Wt = 1200;
   const rowH = n ? Math.min(74, Math.max(42, Math.floor(1300 / n))) : 60;
@@ -2462,7 +2484,7 @@ function drawTeamPerf() {
   drawTextCtx(ctx2, 'Sorted by ' + param + ' - ' + n + ' teams', 40, 64, '#888888', '13px sans-serif', 'left', 'middle');
   if (!n) { drawTextCtx(ctx2, 'No numeric data for this parameter', Wt / 2, Ht / 2, '#999999', 'bold 22px sans-serif'); return; }
 
-  const maxV = Math.max.apply(null, rows.map(function (r) { return Math.abs(r.value); }).concat([0.0001]));
+  const maxV = fullMax;
   const barX0 = 372, barX1 = Wt - 190, barMaxW = barX1 - barX0;
 
   rows.forEach(function (r, i) {
@@ -2511,6 +2533,15 @@ function drawTeamPerf() {
     if (w > 76) drawTextCtx(ctx2, txt, barX0 + w - 10, y, '#ffffff', 'bold 16px sans-serif', 'right', 'middle');
     else drawTextCtx(ctx2, txt, barX0 + w + 10, y, colorA1, 'bold 16px sans-serif', 'left', 'middle');
   });
+
+  // Average performance dotted line (per parameter)
+  const avgX = barX0 + (avgAll / maxV) * barMaxW;
+  ctx2.save();
+  ctx2.setLineDash([6, 5]);
+  ctx2.strokeStyle = '#444444'; ctx2.lineWidth = 2;
+  ctx2.beginPath(); ctx2.moveTo(avgX, 96); ctx2.lineTo(avgX, 106 + n * rowH); ctx2.stroke();
+  ctx2.restore();
+  drawTextCtx(ctx2, 'Avg ' + (Math.round(avgAll * 100) / 100), avgX, 88, '#444444', 'bold 12px sans-serif', 'center', 'middle');
 }
 
 /* ================= XG RACE CHART ================= */
@@ -3270,6 +3301,7 @@ barPlayerA.addEventListener('change', () => { if (currentChart === 'barcomp') dr
 barPlayerB.addEventListener('change', () => { if (currentChart === 'barcomp') drawBarComp(); });
 document.getElementById('momMatch').addEventListener('change', () => { if (currentChart === 'momentum') drawMomentum(); });
 teamPerfParamSelect.addEventListener('change', () => { if (currentChart === 'teamperf') drawTeamPerf(); });
+document.getElementById('teamPerfTopN').addEventListener('input', () => { if (currentChart === 'teamperf') drawTeamPerf(); });
 initColorPicker('teamPerfColorPickerA', 'teamPerfColorBtnA', 'teamPerfColorDropA', colorA1, (c) => { colorA1 = c; if (currentChart === 'teamperf') drawTeamPerf(); });
 initColorPicker('teamPerfColorPickerA2', 'teamPerfColorBtnA2', 'teamPerfColorDropA2', colorA2, (c) => { colorA2 = c; if (currentChart === 'teamperf') drawTeamPerf(); });
 momTeamASelect.addEventListener('change', () => { if (currentChart === 'momentum') drawMomentum(); });
