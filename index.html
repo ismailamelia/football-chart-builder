@@ -932,8 +932,9 @@ function updatePlayerInfoCard(prefix, meta) { return;
   wrap.title = 'No logo URL found in data for this player';
   wrap.appendChild(fallback);
 }
-function loadData(data, sourceName) {
+function loadData(data, sourceName, isFiltered) {
   rawData = data;
+  if (!isFiltered) { rawDataAll = data.slice(); weekdayValue = ''; }
   if (!data || data.length < 2) { fileInfo.textContent = 'Error: Invalid data format'; fileInfo.classList.add('error'); fileInfo.classList.add('show'); return; }
   // Skip duplicate header row if present (e.g. Excel files with header repeated in row 2)
   if (rawData.length > 2) {
@@ -1673,35 +1674,26 @@ function getShotMapTeams() {
   return Array.from(teams);
 }
 function getTeamGoals(teamName) {
-  const lowerH2 = headers.map(x => String(x).toLowerCase().trim());
-  const teamIdx = findColIdx(lowerH2, TEAM_COLS);
-  const goalIdx = findColIdx(lowerH2, ['is_goal', 'goal', 'isgoal']);
-  const outGI = findColIdx(lowerH2, ['shot_outcome', 'shot_outcome_name', 'shot.outcome', 'shot.outcome.name', 'outcome']);
-  if (teamIdx < 0 || (goalIdx < 0 && outGI < 0)) return 0;
+  const teamIdx = headers.findIndex(h => String(h).toLowerCase().trim() === 'team');
+  const goalIdx = headers.findIndex(h => String(h).toLowerCase().trim() === 'is_goal');
+  if (teamIdx < 0 || goalIdx < 0) return 0;
   let count = 0;
-  for (let i = 1; i < rawData.length; i++) { const r = rawData[i]; const isG = goalIdx >= 0 ? parseInt(r[goalIdx]) === 1 : (outGI >= 0 && /goal/i.test(String(r[outGI] || '')) && !/own goal/i.test(String(r[outGI] || ''))); if (r[teamIdx] === teamName && isG) count++; }
+  for (let i = 1; i < rawData.length; i++) { if (rawData[i][teamIdx] === teamName && parseInt(rawData[i][goalIdx]) === 1) count++; }
   return count;
 }
 function getTeamStats(teamName) {
-  const lowerH3 = headers.map(x => String(x).toLowerCase().trim());
-  const teamIdx = findColIdx(lowerH3, TEAM_COLS);
-  const goalIdx = findColIdx(lowerH3, ['is_goal', 'goal', 'isgoal']);
-  const xgIdx = findColIdx(lowerH3, ['xg', 'x_g', 'expected_goals', 'shot.statsbomb_xg', 'statsbomb_xg', 'shot_xg']);
-  const outcomeIdx = findColIdx(lowerH3, ['outcome', 'shot_outcome', 'shot_outcome_name', 'shot.outcome', 'shot.outcome.name']);
-  const typeIdx = findColIdx(lowerH3, TYPE_COLS);
-  const xCol = findColIdx(lowerH3, ['x', 'location', 'location_x', 'start_x', 'shot_x']);
-  const yCol = findColIdx(lowerH3, ['y', 'location', 'location_y', 'start_y', 'shot_y']);
+  const teamIdx = headers.findIndex(h => String(h).toLowerCase().trim() === 'team');
+  const goalIdx = headers.findIndex(h => String(h).toLowerCase().trim() === 'is_goal');
+  const xgIdx = headers.findIndex(h => String(h).toLowerCase().trim() === 'xg');
+  const outcomeIdx = headers.findIndex(h => String(h).toLowerCase().trim() === 'outcome');
   let goals = 0, shots = 0, xgSum = 0, onTarget = 0;
   for (let i = 1; i < rawData.length; i++) {
     const row = rawData[i]; if (row[teamIdx] !== teamName) continue;
-    if (typeIdx >= 0 && !String(row[typeIdx] || '').toLowerCase().includes('shot')) continue;
-    const lp3 = xCol >= 0 && String(row[xCol]).indexOf('[') >= 0 ? parseLocationPair(row[xCol]) : null;
-    const x = lp3 ? lp3[0] : parseFloat(row[xCol]);
-    const y = lp3 ? lp3[1] : parseFloat(row[yCol]);
+    const x = parseFloat(row[headers.findIndex(h => String(h).toLowerCase().trim() === 'x')]);
+    const y = parseFloat(row[headers.findIndex(h => String(h).toLowerCase().trim() === 'y')]);
     if (isNaN(x) || isNaN(y)) continue;
     shots++;
-    const isG3 = goalIdx >= 0 ? parseInt(row[goalIdx]) === 1 : (outcomeIdx >= 0 && /goal/i.test(String(row[outcomeIdx] || '')) && !/own goal/i.test(String(row[outcomeIdx] || '')));
-    if (isG3) goals++;
+    if (goalIdx >= 0 && parseInt(row[goalIdx]) === 1) goals++;
     if (xgIdx >= 0) xgSum += parseFloat(row[xgIdx]) || 0;
     if (outcomeIdx >= 0) { const out = String(row[outcomeIdx] || '').toLowerCase(); if (out.includes('saved') || out.includes('goal') || out.includes('target') || out.includes('post')) onTarget++; }
     else if (goalIdx >= 0 && parseInt(row[goalIdx]) === 1) onTarget++;
@@ -2763,172 +2755,26 @@ function drawXGChart() {
 
 /* ================= PASSING NETWORK ================= */
 
-/* ===== FLEXIBLE COLUMN RESOLVER =====
-   Screens the header row for alternative column titles so raw exports
-   (StatsBomb, Opta-style, etc.) work without renaming columns. */
-function findColIdx(h, candidates) {
-  for (const c of candidates) { const i = h.indexOf(c); if (i >= 0) return i; }
-  return -1;
-}
-
-/* Parse StatsBomb-style "[x, y]" / "{x: .., y: ..}" location cells */
-function parseLocationPair(v) {
-  if (v === null || v === undefined || v === '') return null;
-  if (typeof v === 'object' && v !== null && v.x !== undefined && v.y !== undefined)
-    return [Number(v.x), Number(v.y)];
-  const m = String(v).match(/-?\d+(?:\.\d+)?/g);
-  if (!m || m.length < 2) return null;
-  return [parseFloat(m[0]), parseFloat(m[1])];
-}
-
-const PLAYER_COLS = ['player_name', 'player.name', 'player', 'passer', 'playername'];
-const TEAM_COLS   = ['team', 'team_name', 'team.name', 'squad', 'club', 'club_name', 'side'];
-const MATCH_COLS  = ['match', 'match_name', 'match_id', 'game', 'game_name', 'fixture', 'game_id', 'date'];
-const TYPE_COLS   = ['type_name', 'type.name', 'type', 'event_type', 'event_type_name', 'event_name', 'action_type', 'action'];
-const LOC_COLS    = ['location', 'start_location', 'coordinates', 'xy', 'start_coordinates'];
-
-/* One row per EVENT (StatsBomb raw) instead of one row per player? */
-function isEventLevelData(h) {
-  if (findColIdx(h, PLAYER_COLS) < 0) return false;
-  const hasXY = findColIdx(h, ['x', 'location_x', 'start_x', 'pos_x']) >= 0 &&
-                findColIdx(h, ['y', 'location_y', 'start_y', 'pos_y']) >= 0;
-  return findColIdx(h, LOC_COLS) >= 0 || (findColIdx(h, TYPE_COLS) >= 0 && !hasXY);
-}
-
-/* Builds average-position nodes + pass edges from RAW event rows.
-   This is where player_name / x / y / match / team get CREATED. */
-function buildNetworkFromEvents(data, sourceName) {
-  const h = data[0].map(x => String(x || '').toLowerCase().trim().replace(/\s+/g, '_'));
-  const pI  = findColIdx(h, PLAYER_COLS);
-  const teamI  = findColIdx(h, TEAM_COLS);
-  const matchI = findColIdx(h, MATCH_COLS);
-  const locI   = findColIdx(h, LOC_COLS);
-  const xI = findColIdx(h, ['x', 'location_x', 'start_x', 'pos_x', 'x_coordinate']);
-  const yI = findColIdx(h, ['y', 'location_y', 'start_y', 'pos_y', 'y_coordinate']);
-  const typeI = findColIdx(h, TYPE_COLS);
-  const recI  = findColIdx(h, ['pass_recipient', 'pass_recipient_name', 'pass.recipient', 'pass.recipient.name', 'recipient', 'receiver']);
-  const outI  = findColIdx(h, ['pass_outcome', 'pass_outcome_name', 'pass.outcome', 'pass.outcome.name', 'outcome']);
-  const endLocI = findColIdx(h, ['pass_end_location', 'pass.end_location', 'end_location']);
-  const endXI   = findColIdx(h, ['end_x', 'pass_end_x', 'end_location_x']);
-  const crossI  = findColIdx(h, ['pass_cross', 'pass.cross', 'cross', 'is_cross']);
-  const passTypeI = findColIdx(h, ['pass_type', 'pass_type_name', 'pass.type', 'pass.type.name']);
-  const sAssistI  = findColIdx(h, ['pass_shot_assist', 'pass.shot_assist', 'shot_assist', 'key_pass', 'big_chance_created', 'pass_goal_assist', 'pass.goal_assist', 'goal_assist']);
-
-  const events = [];
-  let maxX = 0;
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (!row) continue;
-    const player = row[pI];
-    if (!player || !String(player).trim()) continue;
-    let x = null, y = null;
-    if (xI >= 0 && yI >= 0 && row[xI] !== '' && row[yI] !== '') { x = parseFloat(row[xI]); y = parseFloat(row[yI]); }
-    else if (locI >= 0) { const p = parseLocationPair(row[locI]); if (p) { x = p[0]; y = p[1]; } }
-    if (x === null || isNaN(x) || y === null || isNaN(y)) continue;
-    maxX = Math.max(maxX, x);
-    const typeStr = typeI >= 0 ? String(row[typeI] || '').toLowerCase().trim() : '';
-    const outcome = outI >= 0 ? String(row[outI] || '').toLowerCase().trim() : '';
-    let endX = null;
-    if (endXI >= 0 && row[endXI] !== '') endX = parseFloat(row[endXI]);
-    else if (endLocI >= 0) { const ep = parseLocationPair(row[endLocI]); if (ep) endX = ep[0]; }
-    let isCross = false;
-    if (crossI >= 0) isCross = ['true', '1', 'yes'].includes(String(row[crossI]).toLowerCase().trim());
-    else if (passTypeI >= 0) isCross = String(row[passTypeI] || '').toLowerCase().includes('cross');
-    let shotAssist = false;
-    if (sAssistI >= 0) shotAssist = ['true', '1', 'yes'].includes(String(row[sAssistI]).toLowerCase().trim());
-    const isPass = typeI < 0 || typeStr.includes('pass');
-    const completed = isPass && (!outcome || (/complete|success|accurate/.test(outcome) && !/incomplete|unsuccessful|failed|missed/.test(outcome)));
-    events.push({
-      player: String(player).trim(),
-      team: teamI >= 0 ? (String(row[teamI] || '').trim() || 'Unknown Team') : 'Unknown Team',
-      match: matchI >= 0 ? (String(row[matchI] || '').trim() || sourceName || 'Uploaded Data') : (sourceName || 'Uploaded Data'),
-      x, y, isPass, completed, endX, isCross, shotAssist,
-      recipient: recI >= 0 ? String(row[recI] || '').trim() : ''
-    });
-  }
-  if (!events.length) return null;
-
-  const thirdX = maxX <= 1.3 ? 2 / 3 : (maxX <= 105 ? 70 : 80); // 120m StatsBomb vs 100m vs normalized
-
-  const groups = {}, pairMap = {};
-  for (const e of events) {
-    const key = e.match + '|' + e.team + '|' + e.player;
-    if (!groups[key]) groups[key] = { match: e.match, team: e.team, player: e.player, sx: 0, sy: 0, n: 0, pa: 0, pc: 0, rec: 0, prog: 0, ft: 0, cross: 0, sa: 0 };
-    const g = groups[key];
-    g.sx += e.x; g.sy += e.y; g.n++;
-    if (!e.isPass) continue;
-    g.pa++;
-    if (e.completed) {
-      g.pc++;
-      if (e.endX !== null && !isNaN(e.endX)) {
-        if (e.endX > thirdX && e.x <= thirdX) g.ft++;
-        if (e.endX - e.x >= 10) g.prog++;
-      }
-      if (e.isCross) g.cross++;
-      if (e.shotAssist) g.sa++;
-    }
-    if (e.recipient) {
-      const pk = e.match + '|' + e.team + '|' + e.player + '->' + e.recipient;
-      pairMap[pk] = (pairMap[pk] || 0) + 1;
-      const rg = groups[e.match + '|' + e.team + '|' + e.recipient];
-      if (rg && e.recipient !== e.player) rg.rec++;
-    }
-  }
-
-  const nodes = [['player_name', 'x', 'y', 'match', 'team', 'no', 'passes_attempted', 'passes_completed', 'progressive_passes', 'into_final_third', 'crosses', 'shot_assists', 'receptions']];
-  for (const k in groups) {
-    const g = groups[k];
-    nodes.push([g.player, g.sx / g.n, g.sy / g.n, g.match, g.team, g.n, g.pa, g.pc, g.prog, g.ft, g.cross, g.sa, g.rec]);
-  }
-  const edges = [['player_a', 'player_b', 'pass_count', 'match', 'team']];
-  for (const pk in pairMap) {
-    const mEnd = pk.indexOf('|'), tEnd = pk.indexOf('|', mEnd + 1);
-    const ab = pk.slice(tEnd + 1).split('->');
-    edges.push([ab[0], ab[1], pairMap[pk], pk.slice(0, mEnd), pk.slice(mEnd + 1, tEnd)]);
-  }
-  return { nodes, edges };
-}
-
 function loadPassingNetworkData(sourceName) {
   if (!rawData || rawData.length < 2) {
     fileInfo.textContent = 'Error: Invalid data format';
     fileInfo.classList.add('error', 'show');
     return;
   }
-  let h = rawData[0].map(x => String(x || '').toLowerCase().trim().replace(/\s+/g, '_'));
-
-  // NEW: auto-detect raw event exports (StatsBomb etc.) and build average
-  // positions + pass edges from the events, creating the standard columns.
-  if (isEventLevelData(h)) {
-    const derived = buildNetworkFromEvents(rawData, sourceName);
-    if (derived) {
-      rawData = derived.nodes;
-      headers = rawData[0];
-      passingEdgesData = derived.edges;
-      h = rawData[0].map(x => String(x || '').toLowerCase().trim().replace(/\s+/g, '_'));
-      fileInfo.textContent = 'Detected raw event data — calculated average positions for ' + (rawData.length - 1) + ' player/team combos.';
-      fileInfo.classList.remove('error');
-      fileInfo.classList.add('show');
-    }
-  }
-
-  const locIdx = findColIdx(h, LOC_COLS);
-  const pNameIdx = findColIdx(h, PLAYER_COLS);
-  const xIdx = findColIdx(h, ['x', 'location_x', 'start_x', 'pos_x', 'x_coordinate', 'avg_x']);
-  const yIdx = findColIdx(h, ['y', 'location_y', 'start_y', 'pos_y', 'y_coordinate', 'avg_y']);
-  const matchIdx = findColIdx(h, MATCH_COLS);
-  const teamIdx = findColIdx(h, TEAM_COLS);
-  const missing = [];
-  if (pNameIdx < 0) missing.push('player_name (tried: player, player.name, passer)');
-  if (xIdx < 0 && locIdx < 0) missing.push('x (tried: location, start_x)');
-  if (yIdx < 0 && locIdx < 0) missing.push('y (tried: location, start_y)');
-  if (matchIdx < 0) missing.push('match (tried: game, fixture, date)');
-  if (teamIdx < 0) missing.push('team (tried: team.name, squad, club)');
+  const h = rawData[0].map(x => String(x || '').toLowerCase().trim().replace(/\s+/g, '_'));
+  const reqCols = ['player_name', 'x', 'y', 'match', 'team'];
+  const missing = reqCols.filter(c => !h.includes(c));
   if (missing.length > 0) {
-    fileInfo.textContent = 'Error: ' + missing.join(' | ') + '. Your columns: ' + h.join(', ');
+    fileInfo.textContent = 'Error: Missing required columns: ' + missing.join(', ');
     fileInfo.classList.add('error', 'show');
     return;
   }
+
+  const pNameIdx = h.indexOf('player_name');
+  const xIdx = h.indexOf('x');
+  const yIdx = h.indexOf('y');
+  const matchIdx = h.indexOf('match');
+  const teamIdx = h.indexOf('team');
   const noIdx = h.indexOf('no');
   const paIdx = h.indexOf('passes_attempted');
   const pcIdx = h.indexOf('passes_completed');
@@ -3485,6 +3331,105 @@ window.addEventListener('resize', () => {
   if (currentChart === 'teamperf') drawTeamPerf();
   if (currentChart === 'passing') updatePassingVisualization();
 });
+
+/* ===== WEEKDAY # FILTER (all charts) ===== */
+let weekdayCol = -1, weekdayValue = '', rawDataAll = null;
+
+function detectWeekdayColumn() {
+  weekdayCol = -1;
+  if (!headers || !headers.length) return;
+  const norm = headers.map(h => String(h || '').toLowerCase().trim().replace(/\s+/g, ' '));
+  for (let i = 0; i < norm.length; i++) {
+    if (norm[i] === 'weekday #' || norm[i] === 'weekday#') { weekdayCol = i; return; }
+  }
+  for (let i = 0; i < norm.length; i++) {
+    if (norm[i] === 'weekday' || norm[i].indexOf('weekday') === 0) { weekdayCol = i; return; }
+  }
+}
+
+function wkVal(row) {
+  const v = (row || [])[weekdayCol];
+  return (v === undefined || v === null) ? '' : String(v).trim();
+}
+
+function refreshWeekdayFilters() {
+  const sels = document.querySelectorAll('.weekday-filter');
+  if (!sels.length) return;
+  let values = [];
+  if (weekdayCol >= 0 && rawDataAll) {
+    const seen = [];
+    for (let i = 1; i < rawDataAll.length; i++) {
+      const v = wkVal(rawDataAll[i]);
+      if (v && seen.indexOf(v) < 0) seen.push(v);
+    }
+    values = seen;
+  }
+  if (weekdayValue && values.indexOf(weekdayValue) < 0) weekdayValue = '';
+  sels.forEach(function(sel) {
+    sel.innerHTML = '';
+    if (weekdayCol < 0) {
+      sel.add(new Option('None', ''));
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    sel.add(new Option('All', ''));
+    values.forEach(v => sel.add(new Option(v, v)));
+    sel.value = weekdayValue;
+  });
+}
+
+function onWeekdayFilterChange(sel) {
+  weekdayValue = sel.value;
+  document.querySelectorAll('.weekday-filter').forEach(function(s) { if (s !== sel) s.value = weekdayValue; });
+  applyWeekdayFilter();
+}
+
+function applyWeekdayFilter() {
+  if (!rawDataAll || !rawDataAll.length) return;
+  let rows = rawDataAll.slice(1);
+  if (weekdayCol >= 0 && weekdayValue) rows = rows.filter(r => wkVal(r) === weekdayValue);
+  if (!rows.length) {
+    fileInfo.textContent = 'No data rows match Weekday # = "' + weekdayValue + '"';
+    fileInfo.classList.add('error'); fileInfo.classList.add('show');
+    return;
+  }
+  fileInfo.classList.remove('show', 'error');
+  // preserve user's current dropdown selections across reload
+  const ids = ['teamA','teamB','xgTeamA','xgTeamB','passmapTeam','passmapPlayer','playerA','playerB','barPlayerA','barPlayerB','momTeamA','momTeamB','momMatch','teamPerfParam','scatterX','scatterY','scatterRankBy'];
+  const saved = {};
+  ids.forEach(id => { const el = document.getElementById(id); if (el) saved[id] = el.value; });
+  loadData([rawDataAll[0]].concat(rows), null, true);
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || saved[id] === undefined) return;
+    for (let i = 0; i < el.options.length; i++) {
+      if (el.options[i].value === saved[id]) { el.value = saved[id]; break; }
+    }
+  });
+  // redraw with restored selections
+  try {
+    if (currentChart === 'radar') drawRadar();
+    else if (currentChart === 'scatter') drawScatter();
+    else if (currentChart === 'teamperf') drawTeamPerf();
+    else if (currentChart === 'barcomp') drawBarComp();
+    else if (currentChart === 'momentum') drawMomentum();
+    else if (currentChart === 'xg') drawXGChart();
+    else if (currentChart === 'shooting') drawShootingMap();
+    else if (currentChart === 'passmap') { refreshPassmapPlayers(); drawPassMap(); }
+  } catch (e) { console.warn('Weekday redraw:', e); }
+}
+
+// inject the filter into all 9 control bars
+['radarControls','scatterControls','shootingControls','passingControls','barcompControls','momentumControls','teamperfControls','xgControls','passmapControls'].forEach(function(id) {
+  const bar = document.getElementById(id);
+  if (!bar) return;
+  const grp = document.createElement('div');
+  grp.className = 'control-group';
+  grp.innerHTML = '<label>Weekday #</label><select class="weekday-filter" onchange="onWeekdayFilterChange(this)"><option value="">None</option></select>';
+  bar.appendChild(grp);
+});
+/* ===== END WEEKDAY # FILTER ===== */
 </script>
 
  <script>
