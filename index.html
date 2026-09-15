@@ -366,10 +366,6 @@ canvas { display: block; width: 100%; height: auto; }
     <div class="control-group"><label>TEAM A</label><select id="boxTeamA" onchange="drawBoxEntries()"><option value="">None</option></select></div>
     <div class="control-group"><label>TEAM B</label><select id="boxTeamB" onchange="drawBoxEntries()"><option value="">None</option></select></div>
     <div class="control-group"><label>SHOW</label><select id="boxShow" onchange="drawBoxEntries()"><option value="all">All Entries</option><option value="success">Successful Only</option></select></div>
-    <div class="control-group"><label>TEAM A LINE</label><div class="color-picker" id="beLinePickerA"><div class="color-picker-btn" id="beLineBtnA" style="background:#16a34a;"></div><div class="color-picker-dropdown" id="beLineDropA"></div></div></div>
-    <div class="control-group"><label>TEAM A HEAD</label><div class="color-picker" id="beHeadPickerA"><div class="color-picker-btn" id="beHeadBtnA" style="background:#15803d;"></div><div class="color-picker-dropdown" id="beHeadDropA"></div></div></div>
-    <div class="control-group"><label>TEAM B LINE</label><div class="color-picker" id="beLinePickerB"><div class="color-picker-btn" id="beLineBtnB" style="background:#2563eb;"></div><div class="color-picker-dropdown" id="beLineDropB"></div></div></div>
-    <div class="control-group"><label>TEAM B HEAD</label><div class="color-picker" id="beHeadPickerB"><div class="color-picker-btn" id="beHeadBtnB" style="background:#1e40af;"></div><div class="color-picker-dropdown" id="beHeadDropB"></div></div></div>
   </div>
   <div class="canvas-wrap" id="radarCanvasWrap"><canvas id="radarCanvas" width="1200" height="1200"></canvas></div>
   <div class="canvas-wrap" id="scatterCanvasWrap"><canvas id="scatterCanvas" width="1200" height="900"></canvas><div class="scatter-overlay" id="scatterOverlay"></div></div>
@@ -3483,10 +3479,6 @@ var beTeamColors = {
   A: { line: '#16a34a', head: '#15803d' },
   B: { line: '#2563eb', head: '#1e40af' }
 };
-initColorPicker('beLinePickerA', 'beLineBtnA', 'beLineDropA', beTeamColors.A.line, c => { beTeamColors.A.line = c; if (currentChart === 'boxentries') drawBoxEntries(); });
-initColorPicker('beHeadPickerA', 'beHeadBtnA', 'beHeadDropA', beTeamColors.A.head, c => { beTeamColors.A.head = c; if (currentChart === 'boxentries') drawBoxEntries(); });
-initColorPicker('beLinePickerB', 'beLineBtnB', 'beLineDropB', beTeamColors.B.line, c => { beTeamColors.B.line = c; if (currentChart === 'boxentries') drawBoxEntries(); });
-initColorPicker('beHeadPickerB', 'beHeadBtnB', 'beHeadDropB', beTeamColors.B.head, c => { beTeamColors.B.head = c; if (currentChart === 'boxentries') drawBoxEntries(); });
 
 function beNorm(h) { return String(h || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 
@@ -3612,12 +3604,12 @@ function populateBoxEntryTeams() {
 
 function beLaneColor(l) { return l === 'Left' ? '#2563eb' : l === 'Centre' ? '#16a34a' : '#f59e0b'; }
 
-function bePitchSVG(entries, showMode, cs) {
+function bePitchSVG(entries, showMode, cs, uid) {
   const W = 120, H = 80, toY = y => H - y;
   const lc = cs.line, hc = cs.head;
   let defs = '<defs>' +
-    '<marker id="beArrG" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="' + hc + '"/></marker>' +
-    '<marker id="beArrR" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="#dc2626"/></marker>';
+    '<marker id="beArrG_' + uid + '" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="' + hc + '"/></marker>' +
+    '<marker id="beArrR_' + uid + '" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="#dc2626"/></marker>';
   let gid = 0;
   let s = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>';
   s += '<line x1="60" y1="0" x2="60" y2="' + H + '" stroke="#cbd5e1" stroke-width="0.8"/>';
@@ -3629,11 +3621,11 @@ function bePitchSVG(entries, showMode, cs) {
   const list = showMode === 'success' ? entries.filter(e => e.success) : entries;
   list.forEach(e => {
     const col = e.success ? lc : '#dc2626';
-    const mk = e.success ? 'beArrG' : 'beArrR';
+    const mk = e.success ? ('beArrG_' + uid) : ('beArrR_' + uid);
     const X2 = +e.ex.toFixed(1), Y2 = +toY(e.ey).toFixed(1);
     if (e.x !== null && e.y !== null) {
       const X1 = +e.x.toFixed(1), Y1 = +toY(e.y).toFixed(1);
-      const g = 'beGrad' + (gid++);
+      const g = 'beGrad' + uid + (gid++);
       defs += '<linearGradient id="' + g + '" gradientUnits="userSpaceOnUse" x1="' + X1 + '" y1="' + Y1 + '" x2="' + X2 + '" y2="' + Y2 + '">' +
               '<stop offset="0" stop-color="' + col + '" stop-opacity="0.3"/>' +
               '<stop offset="1" stop-color="' + col + '" stop-opacity="1"/></linearGradient>';
@@ -3656,7 +3648,7 @@ function beShade(hex, f) {
   return '#' + h(r) + h(g) + h(b);
 }
 
-function bePanel(team, cs) {
+function bePanel(team, cs, key) {
   const showMode = (document.getElementById('boxShow') || {}).value || 'all';
   const entries = getBoxEntries(team);
   const shown = showMode === 'success' ? entries.filter(e => e.success) : entries;
@@ -3679,8 +3671,12 @@ function bePanel(team, cs) {
     '<div><div style="font-size:1.15rem;font-weight:800;color:#0f172a;line-height:1.1;">' + team + '</div>' +
     '<div style="font-size:0.8rem;color:#64748b;">Penalty Box Entries' + (showMode === 'success' ? ' (successful)' : '') + '</div></div>' +
     '<div style="margin-left:auto;text-align:right;"><div style="font-size:1.6rem;font-weight:800;color:#0f172a;line-height:1;">' + total + '</div>' +
-    '<div style="font-size:0.7rem;color:#64748b;">entries</div></div></div>' +
-    bePitchSVG(entries, showMode, cs) +
+    '<div style="font-size:0.7rem;color:#64748b;">entries</div></div>' +
+    '<div style="display:flex;align-items:center;gap:6px;">' +
+    '<div class="color-picker" id="beLinePicker' + key + '"><div class="color-picker-btn" id="beLineBtn' + key + '" style="background:' + cs.line + ';" title="Line color"></div><div class="color-picker-dropdown" id="beLineDrop' + key + '"></div></div>' +
+    '<div class="color-picker" id="beHeadPicker' + key + '"><div class="color-picker-btn" id="beHeadBtn' + key + '" style="background:' + cs.head + ';" title="Head color"></div><div class="color-picker-dropdown" id="beHeadDrop' + key + '"></div></div>' +
+    '</div></div>' +
+    bePitchSVG(entries, showMode, cs, key) +
     '<div style="display:flex;border-radius:8px;overflow:hidden;margin-top:12px;height:52px;">' + segs + '</div></div>';
 }
 
@@ -3691,10 +3687,18 @@ function drawBoxEntries() {
   const b = (document.getElementById('boxTeamB') || {}).value || '';
   if (!boxCols) { wrap.innerHTML = ''; return; }
   let html = '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch;">';
-  html += a ? bePanel(a, beTeamColors.A) : '<div style="flex:1;min-width:320px;color:#64748b;">Pick Team A</div>';
-  if (b && b !== a) html += bePanel(b, beTeamColors.B);
+  html += a ? bePanel(a, beTeamColors.A, 'A') : '<div style="flex:1;min-width:320px;color:#64748b;">Pick Team A</div>';
+  if (b && b !== a) html += bePanel(b, beTeamColors.B, 'B');
   html += '</div>';
   wrap.innerHTML = html;
+  beBindPanelPickers();
+}
+function beBindPanelPickers() {
+  ['A', 'B'].forEach(k => {
+    if (!document.getElementById('beLinePicker' + k)) return;
+    initColorPicker('beLinePicker' + k, 'beLineBtn' + k, 'beLineDrop' + k, beTeamColors[k].line, c => { beTeamColors[k].line = c; if (currentChart === 'boxentries') drawBoxEntries(); });
+    initColorPicker('beHeadPicker' + k, 'beHeadBtn' + k, 'beHeadDrop' + k, beTeamColors[k].head, c => { beTeamColors[k].head = c; if (currentChart === 'boxentries') drawBoxEntries(); });
+  });
 }
 /* ===== END PENALTY BOX ENTRIES ===== */
 </script>
