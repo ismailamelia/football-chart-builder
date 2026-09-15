@@ -944,8 +944,9 @@ function loadData(data, sourceName, isFiltered) {
       rawData.splice(1, 1);
     }
   }
-  headers = data[0]; detectMetaColumns();
+  headers = data[0]; detectMetaColumns(); detectWeekdayColumn(); refreshWeekdayFilters();
   const metaIndices = [metaCols.club, metaCols.position, metaCols.nationality, metaCols.clubLogo].filter(x => x !== null);
+  if (weekdayCol >= 0) metaIndices.push(weekdayCol);
   if (currentChart === 'shooting') {
     if (!detectShotData()) { fileInfo.textContent = 'Error: Missing required columns (x, y, team). Found: ' + headers.join(', '); fileInfo.classList.add('error'); fileInfo.classList.add('show'); return; }
     fileInfo.classList.remove('show', 'error');
@@ -3338,12 +3339,24 @@ let weekdayCol = -1, weekdayValue = '', rawDataAll = null;
 function detectWeekdayColumn() {
   weekdayCol = -1;
   if (!headers || !headers.length) return;
-  const norm = headers.map(h => String(h || '').toLowerCase().trim().replace(/\s+/g, ' '));
-  for (let i = 0; i < norm.length; i++) {
-    if (norm[i] === 'weekday #' || norm[i] === 'weekday#') { weekdayCol = i; return; }
-  }
-  for (let i = 0; i < norm.length; i++) {
-    if (norm[i] === 'weekday' || norm[i].indexOf('weekday') === 0) { weekdayCol = i; return; }
+  // normalize: lowercase, underscores/dashes -> spaces, collapse whitespace, trim
+  const norm = headers.map(h => String(h || '').toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim());
+  const tests = [
+    h => h === 'weekday #' || h === 'weekday#',   // exact "Weekday #"
+    h => h === 'weekday',                          // exact "Weekday"
+    h => h.indexOf('weekday') === 0,               // "Weekday Num", "Weekday Name"
+    h => h.indexOf('weekday') >= 0,                // "Match Weekday"
+    h => /(^|\b)week day\b/.test(h),               // "Week Day", "Match Week Day"
+    h => /day of week/.test(h),                    // "Day Of Week"
+    h => h === 'dow',                              // "DOW"
+    h => h === 'day #' || h === 'day#',            // "Day #"
+    h => h === 'day'                               // bare "Day" (last resort)
+  ];
+  for (const t of tests) {
+    for (let i = 0; i < norm.length; i++) {
+      if (norm[i] === '' || norm[i] === 'player name' || norm[i] === 'player' || norm[i] === 'name') continue;
+      if (t(norm[i])) { weekdayCol = i; return; }
+    }
   }
 }
 
