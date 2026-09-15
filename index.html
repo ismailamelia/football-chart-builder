@@ -366,6 +366,8 @@ canvas { display: block; width: 100%; height: auto; }
     <div class="control-group"><label>TEAM A</label><select id="boxTeamA" onchange="drawBoxEntries()"><option value="">None</option></select></div>
     <div class="control-group"><label>TEAM B</label><select id="boxTeamB" onchange="drawBoxEntries()"><option value="">None</option></select></div>
     <div class="control-group"><label>SHOW</label><select id="boxShow" onchange="drawBoxEntries()"><option value="all">All Entries</option><option value="success">Successful Only</option></select></div>
+    <div class="control-group"><label>ARROW LINE</label><input type="color" id="beLineColor" value="#16a34a" onchange="drawBoxEntries()" style="width:48px;height:34px;border:1px solid #d1d5db;border-radius:8px;padding:2px;background:#fff;cursor:pointer;"></div>
+    <div class="control-group"><label>ARROW HEAD</label><input type="color" id="beHeadColor" value="#15803d" onchange="drawBoxEntries()" style="width:48px;height:34px;border:1px solid #d1d5db;border-radius:8px;padding:2px;background:#fff;cursor:pointer;"></div>
   </div>
   <div class="canvas-wrap" id="radarCanvasWrap"><canvas id="radarCanvas" width="1200" height="1200"></canvas></div>
   <div class="canvas-wrap" id="scatterCanvasWrap"><canvas id="scatterCanvas" width="1200" height="900"></canvas><div class="scatter-overlay" id="scatterOverlay"></div></div>
@@ -3541,8 +3543,27 @@ function getBoxEntryTeams() {
 
 function scanBoxEntryLogos(teams) {
   if (!boxCols || !rawData) return;
+  const clubLogo = {};
+  const allLogos = [];
+  for (let i = 1; i < rawData.length; i++) {
+    const r = rawData[i]; if (!r) continue;
+    let lv = boxCols.logo >= 0 ? String(r[boxCols.logo] || '').trim() : '';
+    if (!/^https?:\/\//i.test(lv)) {
+      for (let j = 0; j < r.length; j++) {
+        const v = String(r[j] || '').trim();
+        if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg)/i.test(v)) { lv = v; break; }
+      }
+    }
+    if (/^https?:\/\//i.test(lv)) {
+      allLogos.push(lv);
+      const cn = boxCols.club >= 0 ? String(r[boxCols.club] || '').trim() : '';
+      if (cn && !clubLogo[cn]) clubLogo[cn] = lv;
+    }
+  }
+  const distinct = [...new Set(allLogos)];
   teams.forEach(t => {
     if (teamLogos[t]) return;
+    // 1) logo column on any row of this team
     if (boxCols.logo >= 0) {
       for (let i = 1; i < rawData.length; i++) {
         const r = rawData[i]; if (!r) continue;
@@ -3551,12 +3572,17 @@ function scanBoxEntryLogos(teams) {
         if (/^https?:\/\//i.test(v)) { teamLogos[t] = v; return; }
       }
     }
+    // 2) club-name pairing (Club Name column, even on block-header rows)
+    if (clubLogo[t]) { teamLogos[t] = clubLogo[t]; return; }
+    // 3) exactly one distinct logo in the whole file -> share it
+    if (distinct.length === 1) { teamLogos[t] = distinct[0]; return; }
+    // 4) first image URL found in any cell of a row of this team
     for (let i = 1; i < rawData.length; i++) {
       const r = rawData[i]; if (!r) continue;
       if (String(r[boxCols.team] || '').trim() !== t) continue;
       for (let j = 0; j < r.length; j++) {
         const v = String(r[j] || '').trim();
-        if (/^https?:\/\//i.test(v)) { teamLogos[t] = v; return; }
+        if (/^https?:\/\/\S+\.(png|jpe?g|gif|webp|svg)/i.test(v)) { teamLogos[t] = v; return; }
       }
     }
   });
@@ -3577,8 +3603,12 @@ function beLaneColor(l) { return l === 'Left' ? '#2563eb' : l === 'Centre' ? '#1
 
 function bePitchSVG(entries, showMode) {
   const W = 120, H = 80, toY = y => H - y;
-  const defs = '<defs><marker id="beArrG" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#16a34a"/></marker>' +
-    '<marker id="beArrR" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#dc2626"/></marker></defs>';
+  const lc = ((document.getElementById('beLineColor') || {}).value) || '#16a34a';
+  const hc = ((document.getElementById('beHeadColor') || {}).value) || lc;
+  let defs = '<defs>' +
+    '<marker id="beArrG" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="' + hc + '"/></marker>' +
+    '<marker id="beArrR" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="#dc2626"/></marker>';
+  let gid = 0;
   let s = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>';
   s += '<line x1="60" y1="0" x2="60" y2="' + H + '" stroke="#cbd5e1" stroke-width="0.8"/>';
   s += '<circle cx="60" cy="40" r="9.15" fill="none" stroke="#cbd5e1" stroke-width="0.8"/>';
@@ -3588,14 +3618,21 @@ function bePitchSVG(entries, showMode) {
   s += '<circle cx="109" cy="40" r="0.8" fill="#94a3b8"/>';
   const list = showMode === 'success' ? entries.filter(e => e.success) : entries;
   list.forEach(e => {
-    const col = e.success ? '#16a34a' : '#dc2626';
+    const col = e.success ? lc : '#dc2626';
     const mk = e.success ? 'beArrG' : 'beArrR';
+    const dot = e.success ? hc : col;
+    const X2 = +e.ex.toFixed(1), Y2 = +toY(e.ey).toFixed(1);
     if (e.x !== null && e.y !== null) {
-      s += '<line x1="' + e.x.toFixed(1) + '" y1="' + toY(e.y).toFixed(1) + '" x2="' + e.ex.toFixed(1) + '" y2="' + toY(e.ey).toFixed(1) +
-           '" stroke="' + col + '" stroke-width="0.7" opacity="0.75" marker-end="url(#' + mk + ')"/>';
+      const X1 = +e.x.toFixed(1), Y1 = +toY(e.y).toFixed(1);
+      const g = 'beGrad' + (gid++);
+      defs += '<linearGradient id="' + g + '" gradientUnits="userSpaceOnUse" x1="' + X1 + '" y1="' + Y1 + '" x2="' + X2 + '" y2="' + Y2 + '">' +
+              '<stop offset="0" stop-color="' + col + '" stop-opacity="0.3"/>' +
+              '<stop offset="1" stop-color="' + col + '" stop-opacity="1"/></linearGradient>';
+      s += '<line x1="' + X1 + '" y1="' + Y1 + '" x2="' + X2 + '" y2="' + Y2 + '" stroke="url(#' + g + ')" stroke-width="0.5" marker-end="url(#' + mk + ')"/>';
     }
-    s += '<circle cx="' + e.ex.toFixed(1) + '" cy="' + toY(e.ey).toFixed(1) + '" r="' + (e.x === null ? 1.3 : 0.9) + '" fill="' + col + '"/>';
+    s += '<circle cx="' + X2 + '" cy="' + Y2 + '" r="' + (e.x === null ? 1.3 : 0.9) + '" fill="' + dot + '"/>';
   });
+  defs += '</defs>';
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;background:#fff;border-radius:8px;">' + defs + s + '</svg>';
 }
 
@@ -3632,10 +3669,7 @@ function drawBoxEntries() {
   const a = (document.getElementById('boxTeamA') || {}).value || '';
   const b = (document.getElementById('boxTeamB') || {}).value || '';
   if (!boxCols) { wrap.innerHTML = ''; return; }
-  let html = '<div style="display:flex;gap:16px;justify-content:center;margin-bottom:10px;font-size:0.78rem;color:#475569;">' +
-    '<span><span style="display:inline-block;width:10px;height:10px;background:#16a34a;border-radius:2px;margin-right:4px;"></span>Successful entry</span>' +
-    '<span><span style="display:inline-block;width:10px;height:10px;background:#dc2626;border-radius:2px;margin-right:4px;"></span>Unsuccessful</span></div>';
-  html += '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch;">';
+  let html = '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch;">';
   html += a ? bePanel(a) : '<div style="flex:1;min-width:320px;color:#64748b;">Pick Team A</div>';
   if (b && b !== a) html += bePanel(b);
   html += '</div>';
