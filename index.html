@@ -366,8 +366,10 @@ canvas { display: block; width: 100%; height: auto; }
     <div class="control-group"><label>TEAM A</label><select id="boxTeamA" onchange="drawBoxEntries()"><option value="">None</option></select></div>
     <div class="control-group"><label>TEAM B</label><select id="boxTeamB" onchange="drawBoxEntries()"><option value="">None</option></select></div>
     <div class="control-group"><label>SHOW</label><select id="boxShow" onchange="drawBoxEntries()"><option value="all">All Entries</option><option value="success">Successful Only</option></select></div>
-    <div class="control-group"><label>ARROW LINE</label><input type="color" id="beLineColor" value="#16a34a" onchange="drawBoxEntries()" style="width:48px;height:34px;border:1px solid #d1d5db;border-radius:8px;padding:2px;background:#fff;cursor:pointer;"></div>
-    <div class="control-group"><label>ARROW HEAD</label><input type="color" id="beHeadColor" value="#15803d" onchange="drawBoxEntries()" style="width:48px;height:34px;border:1px solid #d1d5db;border-radius:8px;padding:2px;background:#fff;cursor:pointer;"></div>
+    <div class="control-group"><label>TEAM A LINE</label><div class="color-picker" id="beLinePickerA"><div class="color-picker-btn" id="beLineBtnA" style="background:#16a34a;"></div><div class="color-picker-dropdown" id="beLineDropA"></div></div></div>
+    <div class="control-group"><label>TEAM A HEAD</label><div class="color-picker" id="beHeadPickerA"><div class="color-picker-btn" id="beHeadBtnA" style="background:#15803d;"></div><div class="color-picker-dropdown" id="beHeadDropA"></div></div></div>
+    <div class="control-group"><label>TEAM B LINE</label><div class="color-picker" id="beLinePickerB"><div class="color-picker-btn" id="beLineBtnB" style="background:#2563eb;"></div><div class="color-picker-dropdown" id="beLineDropB"></div></div></div>
+    <div class="control-group"><label>TEAM B HEAD</label><div class="color-picker" id="beHeadPickerB"><div class="color-picker-btn" id="beHeadBtnB" style="background:#1e40af;"></div><div class="color-picker-dropdown" id="beHeadDropB"></div></div></div>
   </div>
   <div class="canvas-wrap" id="radarCanvasWrap"><canvas id="radarCanvas" width="1200" height="1200"></canvas></div>
   <div class="canvas-wrap" id="scatterCanvasWrap"><canvas id="scatterCanvas" width="1200" height="900"></canvas><div class="scatter-overlay" id="scatterOverlay"></div></div>
@@ -3477,6 +3479,15 @@ function applyWeekdayFilter() {
 let boxCols = null;
 const BE_BOX = { x1: 102, x2: 120, y1: 18, y2: 62 };
 
+var beTeamColors = {
+  A: { line: '#16a34a', head: '#15803d' },
+  B: { line: '#2563eb', head: '#1e40af' }
+};
+initColorPicker('beLinePickerA', 'beLineBtnA', 'beLineDropA', beTeamColors.A.line, c => { beTeamColors.A.line = c; if (currentChart === 'boxentries') drawBoxEntries(); });
+initColorPicker('beHeadPickerA', 'beHeadBtnA', 'beHeadDropA', beTeamColors.A.head, c => { beTeamColors.A.head = c; if (currentChart === 'boxentries') drawBoxEntries(); });
+initColorPicker('beLinePickerB', 'beLineBtnB', 'beLineDropB', beTeamColors.B.line, c => { beTeamColors.B.line = c; if (currentChart === 'boxentries') drawBoxEntries(); });
+initColorPicker('beHeadPickerB', 'beHeadBtnB', 'beHeadDropB', beTeamColors.B.head, c => { beTeamColors.B.head = c; if (currentChart === 'boxentries') drawBoxEntries(); });
+
 function beNorm(h) { return String(h || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 
 function detectBoxEntryData() {
@@ -3601,10 +3612,9 @@ function populateBoxEntryTeams() {
 
 function beLaneColor(l) { return l === 'Left' ? '#2563eb' : l === 'Centre' ? '#16a34a' : '#f59e0b'; }
 
-function bePitchSVG(entries, showMode) {
+function bePitchSVG(entries, showMode, cs) {
   const W = 120, H = 80, toY = y => H - y;
-  const lc = ((document.getElementById('beLineColor') || {}).value) || '#16a34a';
-  const hc = ((document.getElementById('beHeadColor') || {}).value) || lc;
+  const lc = cs.line, hc = cs.head;
   let defs = '<defs>' +
     '<marker id="beArrG" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="' + hc + '"/></marker>' +
     '<marker id="beArrR" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="#dc2626"/></marker>';
@@ -3620,7 +3630,6 @@ function bePitchSVG(entries, showMode) {
   list.forEach(e => {
     const col = e.success ? lc : '#dc2626';
     const mk = e.success ? 'beArrG' : 'beArrR';
-    const dot = e.success ? hc : col;
     const X2 = +e.ex.toFixed(1), Y2 = +toY(e.ey).toFixed(1);
     if (e.x !== null && e.y !== null) {
       const X1 = +e.x.toFixed(1), Y1 = +toY(e.y).toFixed(1);
@@ -3629,14 +3638,25 @@ function bePitchSVG(entries, showMode) {
               '<stop offset="0" stop-color="' + col + '" stop-opacity="0.3"/>' +
               '<stop offset="1" stop-color="' + col + '" stop-opacity="1"/></linearGradient>';
       s += '<line x1="' + X1 + '" y1="' + Y1 + '" x2="' + X2 + '" y2="' + Y2 + '" stroke="url(#' + g + ')" stroke-width="0.5" marker-end="url(#' + mk + ')"/>';
+    } else {
+      s += '<circle cx="' + X2 + '" cy="' + Y2 + '" r="1.3" fill="' + (e.success ? hc : col) + '"/>';
     }
-    s += '<circle cx="' + X2 + '" cy="' + Y2 + '" r="' + (e.x === null ? 1.3 : 0.9) + '" fill="' + dot + '"/>';
   });
   defs += '</defs>';
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;background:#fff;border-radius:8px;">' + defs + s + '</svg>';
 }
 
-function bePanel(team) {
+function beShade(hex, f) {
+  const n = parseInt(String(hex).replace('#', ''), 16);
+  if (isNaN(n)) return hex;
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  if (f >= 0) { r += (255 - r) * f; g += (255 - g) * f; b += (255 - b) * f; }
+  else { r *= (1 + f); g *= (1 + f); b *= (1 + f); }
+  const h = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return '#' + h(r) + h(g) + h(b);
+}
+
+function bePanel(team, cs) {
   const showMode = (document.getElementById('boxShow') || {}).value || 'all';
   const entries = getBoxEntries(team);
   const shown = showMode === 'success' ? entries.filter(e => e.success) : entries;
@@ -3646,8 +3666,9 @@ function bePanel(team) {
   const logo = teamLogos[team] || '';
   const initials = team.split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase();
   const pct = n => total ? Math.round(n / total * 100) : 0;
+  const laneCols = { Left: beShade(cs.head, 0.35), Centre: cs.head, Right: beShade(cs.head, -0.35) };
   const segs = ['Left', 'Centre', 'Right'].map(l =>
-    '<div style="flex:' + Math.max(lanes[l], total ? 0 : 1) + ';background:' + beLaneColor(l) +
+    '<div style="flex:' + Math.max(lanes[l], total ? 0 : 1) + ';background:' + laneCols[l] +
     ';display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;padding:8px 2px;min-width:0;">' +
     '<div style="font-weight:800;font-size:1.05rem;line-height:1;">' + lanes[l] + '</div>' +
     '<div style="font-size:0.72rem;opacity:0.95;">' + l + ' ' + pct(lanes[l]) + '%</div></div>').join('');
@@ -3659,7 +3680,7 @@ function bePanel(team) {
     '<div style="font-size:0.8rem;color:#64748b;">Penalty Box Entries' + (showMode === 'success' ? ' (successful)' : '') + '</div></div>' +
     '<div style="margin-left:auto;text-align:right;"><div style="font-size:1.6rem;font-weight:800;color:#0f172a;line-height:1;">' + total + '</div>' +
     '<div style="font-size:0.7rem;color:#64748b;">entries</div></div></div>' +
-    bePitchSVG(entries, showMode) +
+    bePitchSVG(entries, showMode, cs) +
     '<div style="display:flex;border-radius:8px;overflow:hidden;margin-top:12px;height:52px;">' + segs + '</div></div>';
 }
 
@@ -3670,8 +3691,8 @@ function drawBoxEntries() {
   const b = (document.getElementById('boxTeamB') || {}).value || '';
   if (!boxCols) { wrap.innerHTML = ''; return; }
   let html = '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:stretch;">';
-  html += a ? bePanel(a) : '<div style="flex:1;min-width:320px;color:#64748b;">Pick Team A</div>';
-  if (b && b !== a) html += bePanel(b);
+  html += a ? bePanel(a, beTeamColors.A) : '<div style="flex:1;min-width:320px;color:#64748b;">Pick Team A</div>';
+  if (b && b !== a) html += bePanel(b, beTeamColors.B);
   html += '</div>';
   wrap.innerHTML = html;
 }
