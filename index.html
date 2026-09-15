@@ -91,6 +91,8 @@ select:hover, select:focus { border-color: #0066CC; }
 .team-logo-circle { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #222; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.6rem; color: #222; background: white; text-align: center; line-height: 1; }
 .canvas-wrap { display: none; background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); padding: 10px; margin-bottom: 20px; position: relative; overflow: hidden; width: 100%; max-width: 900px; }
 .canvas-wrap.visible { display: block; }
+#boxentriesChart .color-picker { position: relative; }
+#boxentriesChart .color-picker-dropdown { top: auto; bottom: calc(100% + 8px); }
 canvas { display: block; width: 100%; height: auto; }
 .scatter-overlay { position: absolute; top: 20px; left: 20px; right: 20px; bottom: 20px; pointer-events: none; overflow: hidden; }
 .scatter-marker { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -50%); pointer-events: auto; }
@@ -365,7 +367,7 @@ canvas { display: block; width: 100%; height: auto; }
   <div class="controls teamperf-controls" id="boxentriesControls">
     <div class="control-group"><label>TEAM A</label><select id="boxTeamA" onchange="drawBoxEntries()"><option value="">None</option></select></div>
     <div class="control-group"><label>TEAM B</label><select id="boxTeamB" onchange="drawBoxEntries()"><option value="">None</option></select></div>
-    <div class="control-group"><label>SHOW</label><select id="boxShow" onchange="drawBoxEntries()"><option value="all">All Entries</option><option value="success">Successful Only</option></select></div>
+    <div class="control-group"><label>SHOW</label><select id="boxShow" onchange="drawBoxEntries()"><option value="all">All Entries</option><option value="success">Successful Only</option><option value="goal">Entry Ends With Goal</option></select></div>
   </div>
   <div class="canvas-wrap" id="radarCanvasWrap"><canvas id="radarCanvas" width="1200" height="1200"></canvas></div>
   <div class="canvas-wrap" id="scatterCanvasWrap"><canvas id="scatterCanvas" width="1200" height="900"></canvas><div class="scatter-overlay" id="scatterOverlay"></div></div>
@@ -386,7 +388,7 @@ canvas { display: block; width: 100%; height: auto; }
   <div class="canvas-wrap" id="barcompCanvasWrap"><canvas id="barcompCanvas" width="1200" height="1200"></canvas></div>
   <div class="canvas-wrap" id="momentumCanvasWrap"><canvas id="momentumCanvas" width="1200" height="800"></canvas></div>
   <div class="canvas-wrap" id="teamperfCanvasWrap"><canvas id="teamPerfCanvas" width="1200" height="900"></canvas></div>
-  <div class="canvas-wrap" id="boxentriesCanvasWrap"><div id="boxentriesChart"></div></div>
+  <div class="canvas-wrap" id="boxentriesCanvasWrap" style="overflow:visible;"><div id="boxentriesChart"></div></div>
 </div>
 
 <script>
@@ -3521,10 +3523,45 @@ function getBoxEntries(team) {
       if (!beInsideBox(ex, ey) || beInsideBox(x, y)) continue; // ends in box, started outside
       success = evt === 'Carry' || oc === 'complete' || oc === 'won' || oc === 'success' || oc === 'success in play';
     }
-    const lane = ey >= 53.34 ? 'Left' : (ey <= 26.66 ? 'Right' : 'Centre');
-    out.push({ x: simple ? null : x, y: simple ? null : y, ex, ey, evt, success, lane });
+    const sy = simple ? ey : y; // lane = where the attack STARTED from, not where it ended
+    const lane = sy >= 53.34 ? 'Left' : (sy <= 26.66 ? 'Right' : 'Centre');
+    const mt = boxCols.match >= 0 ? String(r[boxCols.match] || '').trim() : '';
+    out.push({ x: simple ? null : x, y: simple ? null : y, ex, ey, evt, success, lane, team, idx: i, match: mt });
   }
+  out.forEach(e => { const gc = beGoalChain(e); e.chain = gc.chain; e.goal = gc.goal; });
   return out;
+}
+
+const BE_BREAK = ['Ball Recovery', 'Interception', 'Clearance', 'Block', 'Duel', 'Goal Keeper', 'Dribbled Past'];
+function beGoalChain(entry) {
+  const chain = [];
+  if (!boxCols || boxCols.ex < 0 || entry.x === null) return { chain, goal: false }; // needs full event data
+  let cx = entry.ex, cy = entry.ey;
+  const lim = Math.min(rawData.length, entry.idx + 61);
+  for (let j = entry.idx + 1; j < lim; j++) {
+    const r = rawData[j]; if (!r) continue;
+    const t = String(r[boxCols.team] || '').trim();
+    const evt = boxCols.event >= 0 ? String(r[boxCols.event] || '').trim() : '';
+    const oc = boxCols.outcome >= 0 ? String(r[boxCols.outcome] || '').trim().toLowerCase() : '';
+    if (boxCols.match >= 0 && String(r[boxCols.match] || '').trim() !== entry.match) return { chain, goal: false };
+    const x = beNum(r[boxCols.x]), y = beNum(r[boxCols.y]);
+    const ex2 = beNum(r[boxCols.ex]), ey2 = beNum(r[boxCols.ey]);
+    if (t !== entry.team) {
+      if (x !== null && (oc === 'won' || oc === 'complete' || oc === 'success' || BE_BREAK.indexOf(evt) >= 0)) return { chain, goal: false };
+      continue;
+    }
+    if (evt === 'Shot') {
+      if (x !== null) chain.push({ type: 'shot', x, y, ex: ex2 !== null ? ex2 : 120, ey: ey2 !== null ? ey2 : 40 });
+      return { chain, goal: oc === 'goal' };
+    }
+    if (evt === 'Pass' || evt === 'Carry') {
+      if (x === null || ex2 === null) continue;
+      if (Math.hypot(x - cx, y - cy) > 15) return { chain, goal: false }; // possession broken
+      chain.push({ type: 'pass', x, y, ex: ex2, ey: ey2 });
+      cx = ex2; cy = ey2;
+    }
+  }
+  return { chain, goal: false };
 }
 
 function getBoxEntryTeams() {
@@ -3609,7 +3646,7 @@ function bePitchSVG(entries, showMode, cs, uid) {
   const lc = cs.line, hc = cs.head;
   let defs = '<defs>' +
     '<marker id="beArrG_' + uid + '" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="' + hc + '"/></marker>' +
-    '<marker id="beArrR_' + uid + '" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="#dc2626"/></marker>';
+    '<marker id="beArrR_' + uid + '" markerWidth="4" markerHeight="4" refX="3" refY="2" orient="auto"><path d="M0,0 L4,2 L0,4 z" fill="#9ca3af"/></marker>';
   let gid = 0;
   let s = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>';
   s += '<line x1="60" y1="0" x2="60" y2="' + H + '" stroke="#cbd5e1" stroke-width="0.8"/>';
@@ -3618,9 +3655,9 @@ function bePitchSVG(entries, showMode, cs, uid) {
   s += '<rect x="102" y="' + toY(62) + '" width="18" height="44" fill="none" stroke="#94a3b8" stroke-width="0.9"/>';
   s += '<rect x="114" y="' + toY(50) + '" width="6" height="20" fill="none" stroke="#94a3b8" stroke-width="0.9"/>';
   s += '<circle cx="109" cy="40" r="0.8" fill="#94a3b8"/>';
-  const list = showMode === 'success' ? entries.filter(e => e.success) : entries;
+  const list = showMode === 'success' ? entries.filter(e => e.success) : showMode === 'goal' ? entries.filter(e => e.goal) : entries;
   list.forEach(e => {
-    const col = e.success ? lc : '#dc2626';
+    const col = e.success ? lc : '#9ca3af';
     const mk = e.success ? ('beArrG_' + uid) : ('beArrR_' + uid);
     const X2 = +e.ex.toFixed(1), Y2 = +toY(e.ey).toFixed(1);
     if (e.x !== null && e.y !== null) {
@@ -3634,6 +3671,25 @@ function bePitchSVG(entries, showMode, cs, uid) {
       s += '<circle cx="' + X2 + '" cy="' + Y2 + '" r="1.3" fill="' + (e.success ? hc : col) + '"/>';
     }
   });
+  if (showMode === 'goal') {
+    entries.filter(e => e.goal).forEach(e => {
+      e.chain.forEach(c => {
+        const X1 = +c.x.toFixed(1), Y1 = +toY(c.y).toFixed(1);
+        const X2c = +c.ex.toFixed(1), Y2c = +toY(c.ey).toFixed(1);
+        const g = 'beGrad' + uid + (gid++);
+        defs += '<linearGradient id="' + g + '" gradientUnits="userSpaceOnUse" x1="' + X1 + '" y1="' + Y1 + '" x2="' + X2c + '" y2="' + Y2c + '">' +
+                '<stop offset="0" stop-color="' + lc + '" stop-opacity="' + (c.type === 'shot' ? '0.7' : '0.5') + '"/>' +
+                '<stop offset="1" stop-color="' + lc + '" stop-opacity="1"/></linearGradient>';
+        if (c.type === 'shot') {
+          s += '<line x1="' + X1 + '" y1="' + Y1 + '" x2="' + X2c + '" y2="' + Y2c + '" stroke="url(#' + g + ')" stroke-width="0.9" marker-end="url(#beArrG_' + uid + ')"/>';
+          s += '<circle cx="' + X2c + '" cy="' + Y2c + '" r="1.7" fill="none" stroke="' + hc + '" stroke-width="0.5"/>';
+          s += '<circle cx="' + X2c + '" cy="' + Y2c + '" r="0.7" fill="' + hc + '"/>';
+        } else {
+          s += '<line x1="' + X1 + '" y1="' + Y1 + '" x2="' + X2c + '" y2="' + Y2c + '" stroke="url(#' + g + ')" stroke-width="0.45" opacity="0.9"/>';
+        }
+      });
+    });
+  }
   defs += '</defs>';
   return '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;background:#fff;border-radius:8px;">' + defs + s + '</svg>';
 }
@@ -3651,7 +3707,7 @@ function beShade(hex, f) {
 function bePanel(team, cs, key) {
   const showMode = (document.getElementById('boxShow') || {}).value || 'all';
   const entries = getBoxEntries(team);
-  const shown = showMode === 'success' ? entries.filter(e => e.success) : entries;
+  const shown = showMode === 'success' ? entries.filter(e => e.success) : showMode === 'goal' ? entries.filter(e => e.goal) : entries;
   const lanes = { Left: 0, Centre: 0, Right: 0 };
   shown.forEach(e => lanes[e.lane]++);
   const total = shown.length;
@@ -3669,7 +3725,7 @@ function bePanel(team, cs, key) {
     (logo ? '<img src="' + logo + '" style="width:44px;height:44px;object-fit:contain;border-radius:8px;background:#f8fafc;padding:3px;border:1px solid #e2e8f0;" onerror="this.style.display=\'none\'">'
           : '<div style="width:44px;height:44px;border-radius:50%;background:#e2e8f0;color:#475569;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;">' + initials + '</div>') +
     '<div><div style="font-size:1.15rem;font-weight:800;color:#0f172a;line-height:1.1;">' + team + '</div>' +
-    '<div style="font-size:0.8rem;color:#64748b;">Penalty Box Entries' + (showMode === 'success' ? ' (successful)' : '') + '</div></div>' +
+    '<div style="font-size:0.8rem;color:#64748b;">Penalty Box Entries' + (showMode === 'success' ? ' (successful)' : showMode === 'goal' ? ' (ends with goal)' : '') + '</div></div>' +
     '<div style="margin-left:auto;text-align:right;"><div style="font-size:1.6rem;font-weight:800;color:#0f172a;line-height:1;">' + total + '</div>' +
     '<div style="font-size:0.7rem;color:#64748b;">entries</div></div>' +
     '<div style="display:flex;align-items:center;gap:6px;">' +
